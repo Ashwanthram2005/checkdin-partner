@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import BottomNav from '../components/BottomNav';
 import { CheckCircleIcon, ClockIcon, InfoIcon, MinusIcon, PlusIcon } from '../components/Icons';
 import {
-  GST_PCT, INITIAL_PRICING, PLATFORM_FEE, PLATFORM_FEE_TOTAL, SLOTS, guestPays, rateErrors, withPct, youEarn,
+  GST_HIGH_PCT, GST_LOW_PCT, GST_THRESHOLD, INITIAL_PRICING, PLATFORM_FEE, PLATFORM_FEE_TOTAL, PLATFORM_GST_PCT, SLOTS,
+  gstPctFor, guestPays, rateErrors, withPct, youEarn,
   type Adjustments, type PricingState, type SlotHours,
 } from '../data/pricing';
 import '../styles/bookings.css';
@@ -57,7 +58,7 @@ export default function Pricing() {
         </header>
 
         <p className="pr__hint">
-          <InfoIcon /> Slots only: {SLOTS.join(', ')} hours. Prices are before {GST_PCT}% GST. Checkdin charges a platform fee of {inr(PLATFORM_FEE)} + {GST_PCT}% GST ({inr(PLATFORM_FEE_TOTAL)}) per booking, with no commission.
+          <InfoIcon /> Slots only: {SLOTS.join(', ')} hours. Prices are before GST. Checkdin charges a platform fee of {inr(PLATFORM_FEE)} + {PLATFORM_GST_PCT}% GST ({inr(PLATFORM_FEE_TOTAL)}) per booking, with no commission.
         </p>
 
         <ul className="rates">
@@ -90,12 +91,12 @@ export default function Pricing() {
                 ) : (
                   <>
                     <dl className="rate__calc">
-                      <div><dt>Guest pays</dt><dd>{inr(guestPays(rate))}</dd></div>
+                      <div><dt>Guest pays</dt><dd>{inr(guestPays(rate))}</dd><small>incl. {gstPctFor(rate)}% GST</small></div>
                       <div><dt>Platform fee</dt><dd className="fee">−{inr(PLATFORM_FEE_TOTAL)}</dd></div>
                       <div><dt>You earn</dt><dd className="earn">{inr(youEarn(rate))}</dd></div>
                     </dl>
                     {a.weekendOn && (
-                      <p className="rate__wk">Fri–Sun: {inr(withPct(rate, a.weekendPct))} <span>(guest pays {inr(guestPays(withPct(rate, a.weekendPct)))})</span></p>
+                      <p className="rate__wk">Fri–Sun: {inr(withPct(rate, a.weekendPct))} <span>(guest pays {inr(guestPays(withPct(rate, a.weekendPct)))} incl. {gstPctFor(withPct(rate, a.weekendPct))}% GST)</span></p>
                     )}
                   </>
                 )}
@@ -103,7 +104,7 @@ export default function Pricing() {
             );
           })}
         </ul>
-        <p className="pr__fine">“You earn” is the slot price minus the {inr(PLATFORM_FEE)} + {GST_PCT}% GST platform fee. The guest pays the slot price plus {GST_PCT}% GST.</p>
+        <p className="pr__fine">“You earn” is the slot price minus the {inr(PLATFORM_FEE)} + {PLATFORM_GST_PCT}% GST platform fee. The guest pays the slot price plus GST: {GST_LOW_PCT}% up to {inr(GST_THRESHOLD)}, {GST_HIGH_PCT}% above it.</p>
 
         <section className="adj" aria-label="Price adjustments">
           <h2>Adjustments</h2>

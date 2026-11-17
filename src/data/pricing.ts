@@ -16,10 +16,20 @@ export interface PricingState {
 }
 
 /** Platform numbers. There is no commission: Checkdin charges a flat fee per booking. */
-export const GST_PCT = 18;
-export const PLATFORM_FEE = 79;                                  // ₹ per booking, before GST
-export const PLATFORM_FEE_GST = PLATFORM_FEE * (GST_PCT / 100);  // 14.22
+export const PLATFORM_GST_PCT = 18;                                      // GST on the platform fee
+export const PLATFORM_FEE = 79;                                          // ₹ per booking, before GST
+export const PLATFORM_FEE_GST = PLATFORM_FEE * (PLATFORM_GST_PCT / 100); // 14.22
 export const PLATFORM_FEE_TOTAL = Math.round(PLATFORM_FEE + PLATFORM_FEE_GST); // ₹93
+
+/**
+ * GST on the room/slot price (hotel accommodation):
+ *  - up to ₹7,500  → 5%  (no input tax credit for the hotel)
+ *  - above ₹7,500  → 18% (input tax credit available)
+ */
+export const GST_THRESHOLD = 7500;
+export const GST_LOW_PCT = 5;
+export const GST_HIGH_PCT = 18;
+export const gstPctFor = (rate: number) => (rate > GST_THRESHOLD ? GST_HIGH_PCT : GST_LOW_PCT);
 export const MIN_RATE = 100;
 
 /** MOCK DATA — replace with the real pricing API. */
@@ -28,7 +38,7 @@ export const INITIAL_PRICING: PricingState = {
   adjustments: { weekendOn: true, weekendPct: 15, lastMinuteOn: false, lastMinutePct: 10 },
 };
 
-export const guestPays = (rate: number) => Math.round(rate * (1 + GST_PCT / 100));
+export const guestPays = (rate: number) => Math.round(rate * (1 + gstPctFor(rate) / 100));
 /** What the property keeps: the slot price minus the platform fee (₹79 + 18% GST). */
 export const youEarn = (rate: number) => Math.max(0, rate - PLATFORM_FEE_TOTAL);
 export const withPct = (rate: number, pct: number) => Math.round(rate * (1 + pct / 100));
