@@ -38,10 +38,10 @@ export function useActivity() {
     for (const b of bookings.data ?? []) {
       if (b.createdAt) {
         out.push(b.status === 'Cancelled'
-          ? { id: `c-${b.id}`, at: b.createdAt, title: 'Booking cancelled', detail: `${b.guest} · ${b.stayLabel} · ${inr(b.amount)}`, priority: 'High', link: '/bookings' }
-          : { id: `b-${b.id}`, at: b.createdAt, title: 'New booking', detail: `${b.guest} booked ${b.stayLabel} · ${inr(b.amount)}`, priority: 'Normal', link: '/bookings' });
+          ? { id: `c-${b.id}`, at: b.createdAt, title: 'Booking cancelled', detail: `${b.guest} · ${b.stayLabel} · ${inr(b.amount)}`, priority: 'High', link: `/bookings/${b.id}` }
+          : { id: `b-${b.id}`, at: b.createdAt, title: 'New booking', detail: `${b.guest} booked ${b.stayLabel} · ${inr(b.amount)}`, priority: 'Normal', link: `/bookings/${b.id}` });
       }
-      if (b.checkedInAt) out.push({ id: `i-${b.id}`, at: b.checkedInAt, title: 'Guest checked in', detail: `${b.guest} · ${b.stayLabel}`, priority: 'Normal', link: '/bookings' });
+      if (b.checkedInAt) out.push({ id: `i-${b.id}`, at: b.checkedInAt, title: 'Guest checked in', detail: `${b.guest} · ${b.stayLabel}`, priority: 'Normal', link: `/bookings/${b.id}` });
     }
     for (const b of extensions.data ?? []) {
       const e = b.extension;

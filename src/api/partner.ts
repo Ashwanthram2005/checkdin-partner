@@ -72,6 +72,10 @@ export interface BookingExtension {
   requestedAt: Date | null;
   newCheckOut: Date | null;
   rejectionReason: string | null;
+  respondedAt: Date | null;
+  paymentStatus: string;
+  paidTotal: number;
+  hoursTotal: number;
 }
 
 export interface Booking {
@@ -93,6 +97,11 @@ export interface Booking {
   taxRate: number;
   platformFee: number;
   payAtHotel: number;
+  payNow: number;
+  paid: number;
+  discount: number;
+  stayType: string;
+  nights: number | null;
   paymentStatus: string;
   payMode: string;
   checkedInAt: Date | null;
@@ -130,6 +139,11 @@ export function mapBooking(r: Raw): Booking {
     taxRate: num(pb.taxRate),
     platformFee: num(pb.platformFee, num(pb.serviceFee)),
     payAtHotel: num(pb.payAtHotel),
+    payNow: num(pb.payNow),
+    paid: num(r.paid_amount, num(pb.paidNow)),
+    discount: num(pb.discount),
+    stayType: String(r.stay_type ?? 'hourly'),
+    nights: r.nights ? num(r.nights) : null,
     paymentStatus: String(r.payment_status ?? ''),
     payMode: String(r.pay_mode ?? ''),
     checkedInAt: date(r.check_in_time),
@@ -143,6 +157,10 @@ export function mapBooking(r: Raw): Booking {
           requestedAt: date(r.extension_requested_at),
           newCheckOut: date(r.extension_check_out),
           rejectionReason: r.extension_rejection_reason ? String(r.extension_rejection_reason) : null,
+          respondedAt: date(r.extension_responded_at),
+          paymentStatus: String(r.extension_payment_status ?? ''),
+          paidTotal: num(r.extension_paid_total),
+          hoursTotal: num(r.extension_hours_total),
         }
       : null,
   };

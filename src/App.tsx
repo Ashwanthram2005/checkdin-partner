@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import Alerts from './components/Alerts';
 import { RequireAuth } from './auth/AuthContext';
 import Availability from './pages/Availability';
+import BookingDetail from './pages/BookingDetail';
 import Bookings from './pages/Bookings';
 import ExtensionsPage from './pages/ExtensionsPage';
 import ForgotPassword from './pages/ForgotPassword';
@@ -27,6 +28,7 @@ export default function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/home" element={guard(<Home />)} />
       <Route path="/bookings" element={guard(<Bookings />)} />
+      <Route path="/bookings/:id" element={guard(<BookingDetail />)} />
       <Route path="/extensions" element={guard(<ExtensionsPage />)} />
       <Route path="/pricing" element={guard(<Pricing />)} />
       <Route path="/revenue" element={guard(<Revenue />)} />

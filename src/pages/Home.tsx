@@ -108,9 +108,11 @@ export default function Home() {
           <ul className="arrivals">
             {arrivals.map((b) => (
               <li key={b.id}>
-                <span className="avatar">{initials(b.guest)}</span>
-                <span className="arrivals__who"><strong>{b.guest}</strong><small>{b.stayLabel} · {inr(b.amount)}</small></span>
-                <span className="arrivals__time"><strong>{fmtTime(b.checkIn!)}</strong><small>{b.status}</small></span>
+                <Link to={`/bookings/${encodeURIComponent(b.id)}`} className="arrivals__link">
+                  <span className="avatar">{initials(b.guest)}</span>
+                  <span className="arrivals__who"><strong>{b.guest}</strong><small>{b.stayLabel} · {inr(b.amount)}</small></span>
+                  <span className="arrivals__time"><strong>{fmtTime(b.checkIn!)}</strong><small>{b.status}</small></span>
+                </Link>
               </li>
             ))}
           </ul>

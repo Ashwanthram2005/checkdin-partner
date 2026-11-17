@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
 import CheckInSheet from '../components/CheckInSheet';
 import {
-  AlertIcon, ClockIcon, CloseIcon, DownloadIcon, FilterIcon, PhoneIcon, SearchIcon,
+  AlertIcon, ChevronRightSm, ClockIcon, CloseIcon, DownloadIcon, FilterIcon, PhoneIcon, SearchIcon,
 } from '../components/Icons';
 import { getBookings, type Booking, type BookingStatus } from '../api/partner';
 import { useApi } from '../api/useApi';
 import { useAuth } from '../auth/AuthContext';
 import { dayKey, fmtDate, fmtTime, initials, inr } from '../lib/format';
+import '../styles/detail.css';
 import '../styles/bookings.css';
 
 type Tab = 'All' | BookingStatus;
@@ -128,8 +130,9 @@ export default function Bookings() {
               <li key={b.id} className="card-b">
                 <div className="card-b__top">
                   <span className="avatar">{initials(b.guest)}</span>
-                  <div className="card-b__who"><strong>{b.guest}</strong><small>#{b.reference}</small></div>
+                  <div className="card-b__who"><Link to={`/bookings/${encodeURIComponent(b.id)}`} className="card-b__link" aria-label={`Open booking ${b.reference} for ${b.guest}`}><strong>{b.guest}</strong></Link><small>#{b.reference}</small></div>
                   <span className={pillClass(b.status)}>{b.status}</span>
+                  <ChevronRightSm size={18} />
                 </div>
 
                 <dl className="card-b__grid">

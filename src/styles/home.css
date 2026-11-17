@@ -123,3 +123,7 @@
 .home__right { display: flex; align-items: center; gap: 10px; }
 
 @keyframes drop-x { from { transform: translate(-50%, -24px); opacity: 0; } }
+
+.arrivals li { padding: 0; }
+.arrivals__link { display: flex; align-items: center; gap: 12px; padding: 12px 0; color: inherit; text-decoration: none; width: 100%; }
+.arrivals li:first-child .arrivals__link { padding-top: 4px; }
