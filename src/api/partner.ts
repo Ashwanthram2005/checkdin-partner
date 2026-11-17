@@ -95,7 +95,7 @@ export interface Booking {
   base: number;         // price without GST
   tax: number;
   taxRate: number;
-  platformFee: number;
+  guestFee: number;     // service fee the guest was charged, as recorded on the booking
   payAtHotel: number;
   payNow: number;
   paid: number;
@@ -137,7 +137,7 @@ export function mapBooking(r: Raw): Booking {
     base: num(pb.base, num(pb.unitPrice, amount)),
     tax: num(pb.tax),
     taxRate: num(pb.taxRate),
-    platformFee: num(pb.platformFee, num(pb.serviceFee)),
+    guestFee: num(pb.platformFee, num(pb.serviceFee)),
     payAtHotel: num(pb.payAtHotel),
     payNow: num(pb.payNow),
     paid: num(r.paid_amount, num(pb.paidNow)),

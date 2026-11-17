@@ -5,6 +5,7 @@ import { getBookings, type Booking, type BookingStatus } from '../api/partner';
 import { useApi } from '../api/useApi';
 import { addDays, dayKey, fmtDate, inr } from '../lib/format';
 import { dayStats, forecastMonth, sum } from '../lib/stats';
+import { PLATFORM_FEE_TEXT } from '../lib/fees';
 import '../styles/revenue.css';
 
 type Period = '7' | '30' | '90';
@@ -67,7 +68,7 @@ export default function Reports() {
 
   function exportCsv() {
     const stamp = dayKey(today);
-    if (view === 'revenue') download(`revenue-${stamp}.csv`, ['Date', 'Stays', 'Base price', 'Platform fee', 'GST collected', 'Guests paid', 'Net'], days.map((d) => [d.date, d.bookings, d.base, d.fee, d.tax, d.paid, d.net]));
+    if (view === 'revenue') download(`revenue-${stamp}.csv`, ['Date', 'Stays', 'Base price', 'Platform fee', 'GST collected', 'Extension revenue', 'Net'], days.map((d) => [d.date, d.bookings, d.base, Math.round(d.fee * 100) / 100, d.tax, d.ext, Math.round(d.net * 100) / 100]));
     if (view === 'bookings') download(`bookings-${stamp}.csv`, ['Reference', 'Guest', 'Check-in', 'Stay', 'Amount', 'Status'], inRange.map((b) => [b.reference, b.guest, b.checkIn ? dayKey(b.checkIn) : '', b.stayLabel, b.amount, b.status]));
     if (view === 'durations') download(`stay-lengths-${stamp}.csv`, ['Stay', 'Bookings', 'Revenue', 'Share %'], durations.map((d) => [d.label, d.bookings, d.revenue, d.share]));
     if (view === 'guests') download(`guests-${stamp}.csv`, ['Guest', 'Stays', 'Spent'], guests.list.map((g) => [g.name, g.stays, g.spent]));
@@ -97,11 +98,12 @@ export default function Reports() {
             <div><dt>Slot revenue (base)</dt><dd>{inr(totals.base)}</dd></div>
             <div><dt>Platform fee</dt><dd>−{inr(totals.fee)}</dd></div>
             <div><dt>GST collected</dt><dd>{inr(totals.tax)}</dd></div>
-            <div><dt>Guests paid in total</dt><dd>{inr(totals.paid)}</dd></div>
+            <div><dt>Extension revenue</dt><dd>{inr(totals.ext)}</dd></div>
           </dl>
           <div className="tbl-wrap"><table className="tbl"><thead><tr><th>Date</th><th className="r">Stays</th><th className="r">Net</th></tr></thead>
             <tbody>{[...days].reverse().filter((d) => d.bookings > 0).map((d) => <tr key={d.date}><td>{fmtDate(new Date(d.date + 'T00:00'))}</td><td className="r">{d.bookings}</td><td className="r">{inr(d.net)}</td></tr>)}</tbody></table></div>
           {totals.bookings === 0 && <p className="muted-note">No completed stays in this period yet.</p>}
+          <p className="note"><InfoIcon /><span>Platform fee: {PLATFORM_FEE_TEXT} per stay. Extension charges carry no platform fee.</span></p>
         </section>
       )}
 
@@ -151,7 +153,7 @@ export default function Reports() {
             <div><dt>Expected from the rest</dt><dd>{fc.confidence === 'none' ? '—' : inr(fc.expectedRest)}</dd></div>
             <div><dt>Recent daily average</dt><dd>{inr(fc.avgPerDay)}</dd></div>
           </dl>
-          <p className="note"><InfoIcon /> {CONF_TEXT[fc.confidence]} It adds what you’ve earned, stays already booked, and your last 14 days’ average for days with no bookings.</p>
+          <p className="note"><InfoIcon /><span>{CONF_TEXT[fc.confidence]} It adds what you’ve earned, stays already booked, and your last 14 days’ average for days with no bookings.</span></p>
         </section>
       )}
     </SubPage>

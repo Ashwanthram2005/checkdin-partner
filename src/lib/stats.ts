@@ -1,30 +1,33 @@
 import type { Booking } from '../api/partner';
 import { addDays, dayKey } from './format';
+import { PLATFORM_FEE, stayNet } from './fees';
 
 /** Stays that have actually happened count as earnings. */
 export const EARNED = new Set(['Checked in', 'Completed']);
 
-export interface Day { date: string; label: string; bookings: number; base: number; fee: number; tax: number; paid: number; net: number }
-export interface Totals { bookings: number; base: number; fee: number; tax: number; paid: number; net: number }
+export interface Day { date: string; label: string; bookings: number; base: number; fee: number; tax: number; paid: number; ext: number; net: number }
+export interface Totals { bookings: number; base: number; fee: number; tax: number; paid: number; ext: number; net: number }
 
 /** One row per calendar day from `from` to `to`, from stays that checked in or finished. */
 export function dayStats(bookings: Booking[], from: Date, to: Date): Day[] {
   const days: Day[] = [];
-  for (let d = from; d <= to; d = addDays(d, 1)) days.push({ date: dayKey(d), label: '', bookings: 0, base: 0, fee: 0, tax: 0, paid: 0, net: 0 });
+  for (let d = from; d <= to; d = addDays(d, 1)) days.push({ date: dayKey(d), label: '', bookings: 0, base: 0, fee: 0, tax: 0, paid: 0, ext: 0, net: 0 });
   const idx = new Map(days.map((d, i) => [d.date, i]));
   for (const b of bookings) {
     if (!b.checkIn || !EARNED.has(b.status)) continue;
     const i = idx.get(dayKey(b.checkIn));
     if (i === undefined) continue;
     const d = days[i];
-    d.bookings += 1; d.base += b.base; d.fee += b.platformFee; d.tax += b.tax; d.paid += b.amount;
-    d.net += b.base - b.platformFee;
+    // an approved extension adds its full charge; extensions carry no platform fee
+    const ext = b.extension?.status === 'Approved' ? b.extension.amount : 0;
+    d.bookings += 1; d.base += b.base; d.fee += PLATFORM_FEE; d.tax += b.tax; d.paid += b.amount; d.ext += ext;
+    d.net += stayNet(b.base) + ext;
   }
   return days;
 }
 
 export const sum = (days: Day[]): Totals =>
-  days.reduce((t, d) => ({ bookings: t.bookings + d.bookings, base: t.base + d.base, fee: t.fee + d.fee, tax: t.tax + d.tax, paid: t.paid + d.paid, net: t.net + d.net }), { bookings: 0, base: 0, fee: 0, tax: 0, paid: 0, net: 0 });
+  days.reduce((t, d) => ({ bookings: t.bookings + d.bookings, base: t.base + d.base, fee: t.fee + d.fee, tax: t.tax + d.tax, paid: t.paid + d.paid, ext: t.ext + d.ext, net: t.net + d.net }), { bookings: 0, base: 0, fee: 0, tax: 0, paid: 0, ext: 0, net: 0 });
 
 export function niceMax(v: number) {
   if (v <= 0) return 1000;
@@ -61,7 +64,7 @@ export function forecastMonth(bookings: Booking[], today: Date): Forecast {
   const avgPerDay = last14.net / 14;
 
   const future = bookings.filter((b) => b.checkIn && dayKey(b.checkIn) > todayKey && dayKey(b.checkIn) <= dayKey(monthEnd) && (b.status === 'Confirmed' || b.status === 'Upcoming'));
-  const bookedAhead = future.reduce((t, b) => t + b.base - b.platformFee, 0);
+  const bookedAhead = future.reduce((t, b) => t + stayNet(b.base), 0);
   const daysLeft = Math.max(0, monthEnd.getDate() - today.getDate());
   const bookedDays = new Set(future.map((b) => dayKey(b.checkIn!))).size;
   const expectedRest = Math.max(0, daysLeft - bookedDays) * avgPerDay;

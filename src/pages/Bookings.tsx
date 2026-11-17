@@ -142,7 +142,6 @@ export default function Bookings() {
                 </dl>
 
                 <div className="card-b__meta">
-                  {b.platformFee > 0 && <span>Platform fee <b>{inr(b.platformFee)}</b></span>}
                   {b.tax > 0 && <span>GST <b>{inr(b.tax)}</b></span>}
                   {b.phone && <a href={`tel:${b.phone}`} className="call" aria-label={`Call ${b.guest}`}><PhoneIcon size={16} />{b.phone}</a>}
                 </div>

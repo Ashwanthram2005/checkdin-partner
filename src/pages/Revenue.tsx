@@ -7,6 +7,7 @@ import { useApi } from '../api/useApi';
 import { useAuth } from '../auth/AuthContext';
 import { addDays, fmtDate, fmtDayMonth, inr } from '../lib/format';
 import { dayStats, niceMax, sum, tickLabel } from '../lib/stats';
+import { PLATFORM_FEE_TEXT, stayNet } from '../lib/fees';
 import '../styles/bookings.css';
 import '../styles/revenue.css';
 
@@ -44,12 +45,14 @@ export default function Revenue() {
   const ticks = [0, 1, 2, 3, 4].map((i) => (yMax / 4) * i);
 
   const upcoming = (books.data ?? []).filter((b) => (b.status === 'Confirmed' || b.status === 'Upcoming') && b.checkIn && b.checkIn >= new Date(today.getFullYear(), today.getMonth(), today.getDate()));
-  const upcomingNet = upcoming.reduce((t, b) => t + b.base - b.platformFee, 0);
+  const upcomingNet = upcoming.reduce((t, b) => t + stayNet(b.base), 0);
 
+  // where the slot price (with GST) goes. Extension charges carry no platform fee and are kept in full.
+  const whole = totals.net + totals.fee + totals.tax;
   const shares = [
-    { key: 'net', name: 'You keep', note: 'Slot price minus platform fee', value: totals.net, strong: true },
+    { key: 'net', name: 'You keep', note: totals.ext > 0 ? `Includes ${inr(totals.ext)} from extensions` : 'Slot price minus platform fee', value: totals.net, strong: true },
     { key: 'gst', name: 'GST collected', note: 'Passed on to the government', value: totals.tax, strong: false },
-    { key: 'fee', name: 'Platform fee', note: `${totals.bookings} ${totals.bookings === 1 ? 'booking' : 'bookings'}`, value: totals.fee, strong: false },
+    { key: 'fee', name: 'Platform fee', note: `${PLATFORM_FEE_TEXT} × ${totals.bookings} ${totals.bookings === 1 ? 'stay' : 'stays'}`, value: totals.fee, strong: false },
   ].sort((a, b) => b.value - a.value);
 
   const bank = settings.data?.banking;
@@ -132,23 +135,23 @@ export default function Revenue() {
           )}
         </section>
 
-        {!empty && totals.paid > 0 && (
+        {!empty && whole > 0 && (
           <section className="panel" aria-label="Where guest payments go">
-            <div className="panel__head"><div><h2>Where guest payments go</h2><p>Guests paid {inr(totals.paid)} in total</p></div></div>
+            <div className="panel__head"><div><h2>Where the money goes</h2><p>{inr(whole)} in total, with GST</p></div></div>
             <ul className="shares">
               {shares.map((s) => (
                 <li key={s.key}>
                   <div className="share__row">
                     <span className="share__name"><strong>{s.name}</strong><small>{s.note}</small></span>
-                    <span className="share__amt"><strong>{inr(s.value)}</strong><small>{Math.round((s.value / totals.paid) * 100)}%</small></span>
+                    <span className="share__amt"><strong>{inr(s.value)}</strong><small>{Math.round((s.value / whole) * 100)}%</small></span>
                   </div>
-                  <div className="meter" role="img" aria-label={`${s.name}: ${Math.round((s.value / totals.paid) * 100)}% of guest payments`}>
-                    <span className={`meter__fill${s.strong ? ' is-strong' : ''}`} style={{ width: `${Math.min(100, (s.value / totals.paid) * 100)}%` }} />
+                  <div className="meter" role="img" aria-label={`${s.name}: ${Math.round((s.value / whole) * 100)}% of guest payments`}>
+                    <span className={`meter__fill${s.strong ? ' is-strong' : ''}`} style={{ width: `${Math.min(100, (s.value / whole) * 100)}%` }} />
                   </div>
                 </li>
               ))}
             </ul>
-            <p className="note"><InfoIcon /> Estimates from your bookings. Final amounts are confirmed when a payout is settled.</p>
+            <p className="note"><InfoIcon /><span>Estimates from your bookings. The platform fee is {PLATFORM_FEE_TEXT} per stay; extension charges carry no platform fee. Final amounts are confirmed when a payout is settled.</span></p>
           </section>
         )}
 

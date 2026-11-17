@@ -50,6 +50,12 @@ Until then the app alerts only while it is open.
   Allow only `day`, `allocated`, `booked`, `blocked`. The app only ever sends `day`, `allocated`, `blocked`.
 * The portal's availability "Save" sends the word `today` instead of a date, so it saves nothing, and it hides the error.
 
+## Platform fee (as told by the owner)
+Checkdin's fee is **₹79 + 18% GST (₹93.22) per stay booking**, taken from the property's earnings.
+**Extension (stay-longer) charges carry no platform fee.** `src/lib/fees.ts` holds the numbers; Revenue, Reports,
+the forecast and the booking details screen all use it. (A booking made on 14 Nov recorded a ₹49 guest
+service fee; the app shows that as "Guest service fee" and does not use it for earnings.)
+
 ## Notes
 * The portal's Accept / Reject / Check-out on a booking are not saved to the server today (local only),
   so the app does not offer them. Check-in (with code) and extension approve/decline are real.

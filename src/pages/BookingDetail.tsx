@@ -7,6 +7,7 @@ import { getBookings, type Booking } from '../api/partner';
 import { useApi } from '../api/useApi';
 import { useAuth } from '../auth/AuthContext';
 import { fmtDate, fmtTime, inr, initials } from '../lib/format';
+import { PLATFORM_FEE, PLATFORM_FEE_TEXT, stayNet } from '../lib/fees';
 import '../styles/detail.css';
 
 const when = (d: Date | null) => (d ? `${fmtDate(d)}, ${fmtTime(d)}` : '—');
@@ -45,6 +46,8 @@ export default function BookingDetail() {
   const e = b.extension;
   const owesAtHotel = b.paymentStatus.toLowerCase() !== 'paid' && b.payAtHotel > 0;
   const events = timeline(b);
+  const counts = b.status !== 'Cancelled' && b.status !== 'Expired' && b.status !== 'No show';
+  const extEarn = e?.status === 'Approved' ? e.amount : 0;
 
   return (
     <SubPage title={b.guest} subtitle={`#${b.reference}`}>
@@ -88,14 +91,26 @@ export default function BookingDetail() {
           <Row label="Slot price (without GST)">{inr(b.base)}</Row>
           {b.discount > 0 && <Row label="Discount">−{inr(b.discount)}</Row>}
           <Row label={`GST${b.taxRate ? ` (${b.taxRate}%)` : ''}`}>{b.tax ? inr(b.tax) : '—'}</Row>
-          <Row label="Platform fee">{b.platformFee ? inr(b.platformFee) : '—'}</Row>
+          {b.guestFee > 0 && <Row label="Guest service fee">{inr(b.guestFee)}</Row>}
           <Row label="Total" strong>{inr(b.amount)}</Row>
           <Row label="Paid">{inr(b.paid)}{b.payMode ? ` · ${b.payMode}` : ''}</Row>
           {owesAtHotel && <Row label="To collect at the hotel">{inr(b.payAtHotel)}</Row>}
           <Row label="Payment status"><span className={`pay pay--${b.paymentStatus.toLowerCase()}`}>{b.paymentStatus || '—'}</span></Row>
         </dl>
-        {b.base > 0 && <p className="note"><InfoIcon /><span>You earn about <b>{inr(b.base - b.platformFee)}</b> from this stay (slot price minus the platform fee). Final amounts are confirmed when the payout is settled.</span></p>}
-      </section>
+</section>
+
+      {counts && b.base > 0 && (
+        <section className="panel" aria-label="Your earnings">
+          <h2>Your earnings</h2>
+          <dl className="dl">
+            <Row label="Slot price">{inr(b.base)}</Row>
+            <Row label={`Platform fee (${PLATFORM_FEE_TEXT})`}>−{inr(PLATFORM_FEE)}</Row>
+            {extEarn > 0 && <Row label="Extension (no platform fee)">+{inr(extEarn)}</Row>}
+            <Row label="You earn" strong>{inr(stayNet(b.base) + extEarn)}</Row>
+          </dl>
+          <p className="note"><InfoIcon /><span>An estimate. Final amounts are confirmed when the payout is settled.</span></p>
+        </section>
+      )}
 
       {e && (
         <section className="panel" aria-label="Extension">
@@ -103,7 +118,7 @@ export default function BookingDetail() {
           <dl className="dl">
             <Row label="Status"><span className={`pill pill--ext-${e.status.toLowerCase()}`}>{e.status}</span></Row>
             <Row label="Extra time">+{e.extraHours} {e.extraHours === 1 ? 'hour' : 'hours'}</Row>
-            <Row label="Extra charge">{inr(e.amount)}</Row>
+            <Row label="Extra charge">{inr(e.amount)} · no platform fee</Row>
             {e.newCheckOut && <Row label="New check-out">{when(e.newCheckOut)}</Row>}
             {e.requestedAt && <Row label="Requested">{when(e.requestedAt)}</Row>}
             {e.respondedAt && <Row label="Answered">{when(e.respondedAt)}</Row>}
