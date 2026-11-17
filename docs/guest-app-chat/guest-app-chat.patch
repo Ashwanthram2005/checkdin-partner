@@ -1,0 +1,406 @@
+diff --git a/cust/src/App.tsx b/cust/src/App.tsx
+index 13da031..db0c195 100644
+--- a/cust/src/App.tsx
++++ b/cust/src/App.tsx
+@@ -12,6 +12,7 @@ import { Checkout } from './pages/Checkout';
+ import { Confirmation } from './pages/Confirmation';
+ import { Profile } from './pages/Profile';
+ import { Bookings } from './pages/Bookings';
++import { Chat } from './pages/Chat';
+ import { Support } from './pages/Support';
+ import { ListProperty } from './pages/ListProperty';
+ 
+@@ -31,6 +32,7 @@ export function App() {
+                 <Route path="/confirmation" element={<Confirmation />} />
+                 <Route path="/profile" element={<Profile />} />
+                 <Route path="/bookings" element={<Bookings />} />
++                <Route path="/bookings/:id/chat" element={<Chat />} />
+                 <Route path="/support" element={<Support />} />
+                 <Route path="/list-your-property" element={<ListProperty />} />
+               </Routes>
+diff --git a/cust/src/api/messages.ts b/cust/src/api/messages.ts
+new file mode 100644
+index 0000000..330fbdf
+--- /dev/null
++++ b/cust/src/api/messages.ts
+@@ -0,0 +1,73 @@
++import api from './client';
++
++/**
++ * Chat between a guest and the hotel, tied to one booking.
++ * Server side: GET/POST /api/customer/bookings/:id/messages and POST .../messages/read.
++ * If the server doesn't have these yet (404/501) the chat reports itself as unavailable instead of failing.
++ */
++export interface ChatMessage {
++  id: string;
++  from: 'guest' | 'hotel';
++  body: string;
++  at: string; // ISO time
++  read: boolean;
++}
++
++export interface Thread {
++  available: boolean;
++  messages: ChatMessage[];
++}
++
++interface ApiMessage {
++  id: string;
++  sender: 'partner' | 'guest';
++  body: string;
++  created_at: string;
++  read_at?: string | null;
++}
++
++function isMissing(err: unknown): boolean {
++  const status = (err as { response?: { status?: number } })?.response?.status;
++  return status === 404 || status === 501;
++}
++
++export async function fetchThread(bookingId: string): Promise<Thread> {
++  try {
++    const res = await api.get<{ data: ApiMessage[] }>(`/api/customer/bookings/${encodeURIComponent(bookingId)}/messages`);
++    const rows = Array.isArray(res.data?.data) ? res.data.data : [];
++    return {
++      available: true,
++      messages: rows
++        .map((m): ChatMessage => ({
++          id: String(m.id),
++          from: m.sender === 'guest' ? 'guest' : 'hotel',
++          body: String(m.body ?? ''),
++          at: m.created_at,
++          read: !!m.read_at,
++        }))
++        .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime()),
++    };
++  } catch (err) {
++    if (isMissing(err)) return { available: false, messages: [] };
++    throw err;
++  }
++}
++
++export async function sendMessage(bookingId: string, body: string): Promise<void> {
++  await api.post(`/api/customer/bookings/${encodeURIComponent(bookingId)}/messages`, { body });
++}
++
++export async function markThreadRead(bookingId: string): Promise<void> {
++  await api.post(`/api/customer/bookings/${encodeURIComponent(bookingId)}/messages/read`, {});
++}
++
++/** Hotel messages the guest has not read yet. */
++export function countUnread(messages: ChatMessage[]): number {
++  return messages.filter((m) => m.from === 'hotel' && !m.read).length;
++}
++
++/** Turns a failed request into something a guest can read. */
++export function errorText(err: unknown): string {
++  const e = err as { response?: { data?: { error?: string; message?: string } }; message?: string };
++  return e?.response?.data?.error || e?.response?.data?.message || 'Could not send. Check your connection and try again.';
++}
+diff --git a/cust/src/pages/Bookings.tsx b/cust/src/pages/Bookings.tsx
+index d93782a..182d216 100644
+--- a/cust/src/pages/Bookings.tsx
++++ b/cust/src/pages/Bookings.tsx
+@@ -4,6 +4,7 @@ import {
+   CalendarIcon,
+   ClockIcon,
+   KeyRoundIcon,
++  MessageCircleIcon,
+   MapPinIcon,
+   StarIcon,
+   TicketIcon } from
+@@ -14,6 +15,7 @@ import { loadHotel } from '../data/hotels';
+ import { loadBookings, type BookingRecord, type BookingStatus } from '../data/bookings';
+ import { checkoutTime, dateLabel, inr, toTimeLabel } from '../utils/format';
+ import type { Hotel } from '../types/booking';
++import { countUnread, fetchThread } from '../api/messages';
+ 
+ const tabs: {id: BookingStatus;label: string;}[] = [
+ { id: 'ongoing', label: 'Ongoing' },
+@@ -23,11 +25,20 @@ const tabs: {id: BookingStatus;label: string;}[] = [
+ 
+ function BookingRow({ booking }: {booking: BookingRecord;}) {
+   const [hotel, setHotel] = useState<Hotel | undefined>(undefined);
++  const [unread, setUnread] = useState(0);
+ 
+   useEffect(() => {
+     loadHotel(booking.hotelId).then((h) => setHotel(h));
+   }, [booking.hotelId]);
+ 
++  // how many hotel messages are waiting (only for real, ongoing bookings)
++  useEffect(() => {
++    if (booking.status !== 'ongoing' || booking.id === 'live') return;
++    let alive = true;
++    fetchThread(booking.id).then((t) => alive && setUnread(countUnread(t.messages))).catch(() => undefined);
++    return () => { alive = false; };
++  }, [booking.id, booking.status]);
++
+   if (!hotel) return null;
+ 
+   return (
+@@ -113,6 +124,20 @@ function BookingRow({ booking }: {booking: BookingRecord;}) {
+               
+                 View booking
+               </Link>
++              {booking.id !== 'live' &&
++              <Link
++              to={`/bookings/${booking.id}/chat`}
++              className="relative inline-flex items-center gap-2 rounded-xl border border-line px-5 py-2.5 text-sm font-semibold transition-colors duration-150 ease-smooth hover:border-ink">
++              
++                <MessageCircleIcon className="h-4 w-4" aria-hidden="true" />
++                Message hotel
++                {unread > 0 &&
++                <span className="ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-ink px-1.5 text-[11px] font-bold text-primary" aria-label={`${unread} new ${unread === 1 ? 'message' : 'messages'}`}>
++                    {unread}
++                  </span>
++                }
++              </Link>
++              }
+               <Link
+               to="/support"
+               className="rounded-xl border border-line px-5 py-2.5 text-sm font-semibold transition-colors duration-150 ease-smooth hover:border-ink">
+diff --git a/cust/src/pages/Chat.tsx b/cust/src/pages/Chat.tsx
+new file mode 100644
+index 0000000..65c6a58
+--- /dev/null
++++ b/cust/src/pages/Chat.tsx
+@@ -0,0 +1,239 @@
++import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
++import { Link, useParams } from 'react-router-dom';
++import { AlertCircleIcon, ArrowLeftIcon, InfoIcon, MessageCircleIcon, RefreshCwIcon, SendIcon } from 'lucide-react';
++import { useAuth } from '../contexts/AuthContext';
++import { fetchBookingById, type BookingRecord } from '../api/bookings';
++import { countUnread, errorText, fetchThread, markThreadRead, sendMessage, type ChatMessage } from '../api/messages';
++import { loadHotel } from '../data/hotels';
++import { checkoutTime, dateLabel, toTimeLabel } from '../utils/format';
++import type { Hotel } from '../types/booking';
++
++const POLL_MS = 8000;
++const QUICK = [
++  'Can I check in a little early?',
++  'Where do I go when I arrive?',
++  'Can I extend my stay?',
++  'Is parking available?',
++];
++
++interface Outgoing {
++  cid: string;
++  body: string;
++  at: string;
++  failed?: boolean;
++  error?: string;
++}
++
++const clock = (iso: string) => new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
++
++function dayHeading(iso: string): string {
++  const d = new Date(iso);
++  const today = new Date();
++  const yesterday = new Date();
++  yesterday.setDate(today.getDate() - 1);
++  if (d.toDateString() === today.toDateString()) return 'Today';
++  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
++  return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
++}
++
++export function Chat() {
++  const { id = '' } = useParams();
++  const { user, openAuth } = useAuth();
++  const [booking, setBooking] = useState<BookingRecord | null | undefined>(undefined);
++  const [hotel, setHotel] = useState<Hotel | undefined>(undefined);
++  const [messages, setMessages] = useState<ChatMessage[]>([]);
++  const [available, setAvailable] = useState(true);
++  const [loaded, setLoaded] = useState(false);
++  const [loadError, setLoadError] = useState<string | null>(null);
++  const [outbox, setOutbox] = useState<Outgoing[]>([]);
++  const [text, setText] = useState('');
++  const endRef = useRef<HTMLDivElement>(null);
++
++  useEffect(() => {
++    if (!user) return;
++    let alive = true;
++    fetchBookingById(id).then((b) => {
++      if (!alive) return;
++      setBooking(b);
++      if (b) loadHotel(b.hotelId).then((h) => alive && setHotel(h));
++    });
++    return () => { alive = false; };
++  }, [id, user]);
++
++  const refresh = useCallback(async () => {
++    try {
++      const t = await fetchThread(id);
++      setAvailable(t.available);
++      setMessages(t.messages);
++      setLoadError(null);
++      if (countUnread(t.messages) > 0) markThreadRead(id).catch(() => undefined);
++    } catch (err) {
++      setLoadError(errorText(err));
++    } finally {
++      setLoaded(true);
++    }
++  }, [id]);
++
++  useEffect(() => {
++    if (!user) return;
++    void refresh();
++    const t = window.setInterval(refresh, POLL_MS);
++    return () => window.clearInterval(t);
++  }, [refresh, user]);
++
++  const items = useMemo(() => {
++    const pending = outbox.map((o) => ({ id: o.cid, from: 'guest' as const, body: o.body, at: o.at, read: false, cid: o.cid, failed: o.failed, error: o.error }));
++    return [...messages.map((m) => ({ ...m, cid: undefined as string | undefined, failed: false, error: undefined as string | undefined })), ...pending]
++      .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
++  }, [messages, outbox]);
++
++  useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [items.length]);
++
++  const send = useCallback(async (body: string, cid = `c${Date.now()}`) => {
++    const msg = body.trim();
++    if (!msg) return;
++    setOutbox((o) => (o.some((x) => x.cid === cid) ? o.map((x) => (x.cid === cid ? { ...x, failed: false, error: undefined } : x)) : [...o, { cid, body: msg, at: new Date().toISOString() }]));
++    try {
++      await sendMessage(id, msg);
++      setOutbox((o) => o.filter((x) => x.cid !== cid));
++      void refresh();
++    } catch (err) {
++      setOutbox((o) => o.map((x) => (x.cid === cid ? { ...x, failed: true, error: errorText(err) } : x)));
++    }
++  }, [id, refresh]);
++
++  function submit(e: FormEvent) {
++    e.preventDefault();
++    if (!text.trim()) return;
++    const body = text;
++    setText('');
++    void send(body);
++  }
++
++  if (!user) {
++    return (
++      <div className="mx-auto w-full max-w-[640px] px-5 py-24 text-center lg:px-8">
++        <h1 className="font-display text-3xl">Sign in to message the hotel</h1>
++        <p className="mt-3 text-muted">Your chats are tied to your bookings.</p>
++        <button type="button" onClick={() => openAuth()} className="mt-6 rounded-xl bg-primary px-6 py-3.5 text-sm font-bold text-ink transition-colors duration-150 ease-smooth hover:bg-primary-dark">Sign in</button>
++      </div>
++    );
++  }
++
++  if (booking === null) {
++    return (
++      <div className="mx-auto w-full max-w-[640px] px-5 py-24 text-center lg:px-8">
++        <h1 className="font-display text-3xl">Booking not found</h1>
++        <p className="mt-3 text-muted">We couldn’t find that booking.</p>
++        <Link to="/bookings" className="mt-6 inline-block rounded-xl border border-line px-5 py-2.5 text-sm font-semibold hover:border-ink">Back to my bookings</Link>
++      </div>
++    );
++  }
++
++  const closed = booking?.status === 'cancelled';
++  const readOnly = booking?.status === 'completed' || closed;
++  let lastDay = '';
++
++  return (
++    <div className="mx-auto flex w-full max-w-[760px] flex-col px-4 py-6 sm:px-5 lg:py-10">
++      <div className="flex items-center gap-3">
++        <Link to="/bookings" aria-label="Back to my bookings" className="grid h-10 w-10 place-items-center rounded-full border border-line bg-surface transition-colors duration-150 ease-smooth hover:border-ink">
++          <ArrowLeftIcon className="h-4 w-4" aria-hidden="true" />
++        </Link>
++        <div className="min-w-0">
++          <h1 className="truncate text-lg font-bold">{hotel ? hotel.name : 'Your hotel'}</h1>
++          {booking && (
++            <p className="truncate text-sm text-muted">
++              {booking.reference} · {dateLabel(booking.date)} · {toTimeLabel(booking.checkIn)} – {checkoutTime(booking.checkIn, booking.duration)}
++            </p>
++          )}
++        </div>
++      </div>
++
++      <section aria-label="Messages" className="mt-5 flex min-h-[420px] flex-1 flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
++        <div className="flex-1 space-y-2 overflow-y-auto px-4 py-4" style={{ maxHeight: '60vh' }} aria-live="polite">
++          {loadError && !loaded && (
++            <p role="alert" className="flex items-start gap-2 rounded-xl bg-accent-soft px-3 py-2 text-sm text-accent">
++              <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> {loadError}
++            </p>
++          )}
++
++          {loaded && !available && (
++            <div role="status" className="rounded-xl bg-canvas p-4 text-sm">
++              <p className="flex items-start gap-2"><InfoIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> Chatting with the hotel in the app isn’t available just yet.</p>
++              <Link to="/support" className="mt-3 inline-block rounded-lg bg-primary px-4 py-2 text-sm font-bold text-ink hover:bg-primary-dark">Contact support</Link>
++            </div>
++          )}
++
++          {!loaded && !loadError && <p className="py-10 text-center text-sm text-muted">Loading your messages…</p>}
++
++          {loaded && available && items.length === 0 && (
++            <div className="grid place-items-center py-14 text-center">
++              <span className="grid h-12 w-12 place-items-center rounded-full bg-primary-soft"><MessageCircleIcon className="h-5 w-5" aria-hidden="true" /></span>
++              <p className="mt-3 font-bold">No messages yet</p>
++              <p className="mt-1 max-w-[300px] text-sm text-muted">Ask the hotel anything about your stay: arrival, early check-in, or extending your slot.</p>
++            </div>
++          )}
++
++          {items.map((m) => {
++            const heading = dayHeading(m.at);
++            const showHeading = heading !== lastDay;
++            lastDay = heading;
++            const mine = m.from === 'guest';
++            return (
++              <div key={m.id}>
++                {showHeading && <p className="my-3 text-center text-xs font-bold text-muted">{heading}</p>}
++                <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
++                  <div
++                    className={`max-w-[82%] rounded-2xl px-3.5 py-2 text-[15px] leading-snug ${mine ? 'rounded-br-md bg-primary text-ink' : 'rounded-bl-md border border-line bg-canvas'} ${m.cid && !m.failed ? 'opacity-70' : ''} ${m.failed ? 'ring-2 ring-accent' : ''}`}>
++                    <p className="whitespace-pre-wrap break-words">{m.body}</p>
++                    <p className="mt-1 text-right text-[11px] opacity-60">
++                      {clock(m.at)}{mine && !m.cid ? (m.read ? ' · Seen' : ' · Sent') : ''}{m.cid && !m.failed ? ' · Sending…' : ''}
++                    </p>
++                    {m.failed && m.cid && (
++                      <p className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-accent">
++                        Not sent.
++                        <button type="button" onClick={() => void send(m.body, m.cid)} className="inline-flex items-center gap-1 underline"><RefreshCwIcon className="h-3 w-3" aria-hidden="true" /> Retry</button>
++                        <button type="button" onClick={() => setOutbox((o) => o.filter((x) => x.cid !== m.cid))} className="underline">Remove</button>
++                      </p>
++                    )}
++                  </div>
++                </div>
++              </div>
++            );
++          })}
++          <div ref={endRef} />
++        </div>
++
++        <div className="border-t border-line bg-surface px-3 pb-3 pt-2">
++          {readOnly && available && (
++            <p className="px-1 pb-2 text-center text-xs text-muted">{closed ? 'This booking was cancelled.' : 'This stay has ended, so new messages are switched off.'}</p>
++          )}
++          {!readOnly && available && (
++            <div className="mb-2 flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Quick questions">
++              {QUICK.map((q) => (
++                <button key={q} type="button" onClick={() => setText(q)} className="shrink-0 rounded-full border border-line px-3 py-1.5 text-xs font-semibold transition-colors duration-150 ease-smooth hover:border-ink">{q}</button>
++              ))}
++            </div>
++          )}
++          <form onSubmit={submit} className="flex items-end gap-2">
++            <label htmlFor="chat-input" className="sr-only">Message the hotel</label>
++            <textarea
++              id="chat-input"
++              rows={1}
++              maxLength={1000}
++              value={text}
++              disabled={!available || readOnly}
++              placeholder={!available ? 'Chat isn’t available yet' : readOnly ? 'Messaging is closed' : 'Type a message'}
++              onChange={(e) => setText(e.target.value)}
++              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
++              className="max-h-32 min-h-[46px] flex-1 resize-none rounded-2xl border border-line bg-canvas px-4 py-3 text-[15px] outline-none transition-colors duration-150 ease-smooth focus:border-ink focus:bg-surface disabled:opacity-60" />
++            <button type="submit" disabled={!available || readOnly || !text.trim()} aria-label="Send message" className="grid h-[46px] w-[46px] shrink-0 place-items-center rounded-full bg-primary text-ink transition-colors duration-150 ease-smooth hover:bg-primary-dark disabled:bg-line disabled:text-muted">
++              <SendIcon className="h-5 w-5" aria-hidden="true" />
++            </button>
++          </form>
++        </div>
++      </section>
++    </div>
++  );
++}

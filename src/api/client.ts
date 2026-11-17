@@ -1,4 +1,5 @@
 import { API_URL } from '../config';
+import { NET_FAIL, NET_OK } from '../lib/network';
 
 const KEY = 'checkdin.partner.session';
 
@@ -56,6 +57,7 @@ export async function api<T>(path: string, { method = 'GET', body, auth = true, 
   try {
     res = await fetch(`${API_URL}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: ctrl.signal });
   } catch (e) {
+    window.dispatchEvent(new Event(NET_FAIL));
     throw new ApiError(
       (e as Error).name === 'AbortError' ? 'The server took too long to answer. Please try again.' : 'Could not reach the server. Check your internet connection.',
       0,
@@ -64,6 +66,7 @@ export async function api<T>(path: string, { method = 'GET', body, auth = true, 
     clearTimeout(timer);
   }
 
+  window.dispatchEvent(new Event(NET_OK)); // the server answered
   let data: unknown = null;
   try { data = await res.json(); } catch { /* empty body */ }
 

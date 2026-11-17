@@ -68,6 +68,12 @@ Until then the app alerts only while it is open.
   Android opens those partner.checkdin.in links in the app (not verified app links, so Android may ask which app to use).
 * **Rules & policies is not built**: on the partner site its "Save" does not save anything (no server call), so there is nothing real to show.
 
+## Changes in v0.6
+* **Offline screen**: a full-screen "You're offline" / "Can't reach Checkdin" view that sits over the app (nothing typed is lost),
+  retries quietly every 10 s, and refreshes every list when the connection returns. Uses the phone's network status plus
+  two failed requests in a row to detect the server not answering.
+* **Guest-app chat**: see `docs/guest-app-chat/`.
+
 ## Platform fee (as told by the owner)
 Checkdin's fee is **₹79 + 18% GST (₹93.22) per stay booking**, taken from the property's earnings.
 **Extension (stay-longer) charges carry no platform fee.** `src/lib/fees.ts` holds the numbers; Revenue, Reports,

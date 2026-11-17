@@ -16,7 +16,6 @@ A missing endpoint (404/501) turns chat off in the app; any other error is shown
 ## What still has to be built for it to work end to end
 1. **Server**: the patch in `docs/backend-messaging/` (table, model, controller, routes). Written against this
    repo's conventions, **not yet run against a database**, so test it first.
-2. **Guest app (`cust`)**: a chat screen on a booking that calls the `/api/customer/bookings/:id/messages` endpoints,
-   otherwise guests can never see or answer hotel messages.
+2. **Guest app (`cust`)**: done as a patch, see `docs/guest-app-chat/` (chat screen, "Message hotel" button with unread count).
 3. **Push alerts** (optional, see APP_REQUIREMENTS.md): so the hotel and the guest are told when the app is closed.
    The partner app already polls while it is open (chat every 8 s, conversation list every 15 s) and shows a banner.

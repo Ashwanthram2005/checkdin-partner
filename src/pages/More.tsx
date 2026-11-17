@@ -13,7 +13,7 @@ import { initials } from '../lib/format';
 import '../styles/bookings.css';
 import '../styles/more.css';
 
-const VERSION = '0.5.0';
+const VERSION = '0.6.0';
 const PORTAL = 'https://partner.checkdin.in';
 
 const PROPERTY_MENU = [

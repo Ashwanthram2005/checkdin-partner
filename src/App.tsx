@@ -3,6 +3,7 @@ import AccountLink from './pages/AccountLink';
 import ActivityLog from './pages/ActivityLog';
 import Alerts from './components/Alerts';
 import DeepLinks from './components/DeepLinks';
+import OfflineGate from './components/OfflineGate';
 import { RequireAuth } from './auth/AuthContext';
 import Availability from './pages/Availability';
 import BookingDetail from './pages/BookingDetail';
@@ -32,6 +33,7 @@ export default function App() {
   return (
     <>
     <DeepLinks />
+    <OfflineGate />
     <Routes>
       <Route path="/" element={<Welcome />} />
       <Route path="/login" element={<Login />} />

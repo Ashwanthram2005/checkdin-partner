@@ -5,7 +5,7 @@ const { genId, nowIso } = require("../lib/utils");
 const MAX_LEN = 1000;
 
 async function findBooking(id) {
-  return dbFetch("SELECT id, hotel_id, customer_id, status FROM bookings WHERE id=$1", [id]);
+  return dbFetch("SELECT id, hotel_id, customer_id, status FROM customer_bookings WHERE id=$1", [id]);
 }
 
 async function listThread(bookingId) {
