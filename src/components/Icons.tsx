@@ -1,14 +1,5 @@
 type P = { size?: number };
 
-export const LogoIcon = ({ size = 44 }: P) => (
-  <svg width={size} height={size} viewBox="0 0 44 44" fill="none" aria-hidden="true">
-    <circle cx="22" cy="22" r="22" fill="var(--lime)" />
-    <circle cx="22" cy="22" r="11" stroke="#111" strokeWidth="2.6" />
-    <path d="M22 7.5v3.5M22 33v3.5M7.5 22H11M33 22h3.5" stroke="#111" strokeWidth="2.6" strokeLinecap="round" />
-    <path d="M17.5 22.2l3.2 3.2 6-6.4" stroke="#111" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
 export const LoginIcon = ({ size = 22 }: P) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M14 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4" />

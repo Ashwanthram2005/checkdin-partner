@@ -1,5 +1,5 @@
 :root {
-  --lime: #dcf73a;
+  --lime: #d0f047;
   --lime-soft: #f8fde6;
   --ink: #111111;
   --ink-muted: #3d3d3d;
@@ -29,8 +29,9 @@ a { color: inherit; }
 }
 
 /* Brand */
-.brand { display: flex; align-items: center; justify-content: center; gap: 8px; }
-.brand__name { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; }
+.brand { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.brand__mark { width: 44px; height: auto; display: block; }
+.brand__word { height: 26px; width: auto; display: block; }
 .brand__badge {
   background: var(--ink); color: var(--lime);
   font-size: 13px; font-weight: 700; letter-spacing: 0.14em;
@@ -211,7 +212,7 @@ button.back { border: 0; cursor: pointer; }
 button.link-lime { background: none; border: 0; cursor: pointer; font: inherit; font-size: 14px; font-weight: 600; }
 
 
-.card .demo-note { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 12px; background: rgba(220,247,58,.12); border: 1px solid rgba(220,247,58,.35); color: var(--on-dark-muted); font-size: 13px; line-height: 1.4; }
+.card .demo-note { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 12px; background: rgba(208,240,71,.12); border: 1px solid rgba(208,240,71,.35); color: var(--on-dark-muted); font-size: 13px; line-height: 1.4; }
 .demo-note svg { flex: none; margin-top: 1px; color: var(--lime); }
 .demo-note b { color: #fff; }
 

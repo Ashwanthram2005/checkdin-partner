@@ -6,7 +6,7 @@
 .profile__avatar { width: 58px; height: 58px; border-radius: 50%; background: var(--lime); color: var(--ink); display: grid; place-items: center; font-size: 21px; font-weight: 800; }
 .profile__text { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
 .profile__text strong { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
-.role-pill { background: rgba(220,247,58,.16); color: var(--lime); border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; }
+.role-pill { background: rgba(208,240,71,.16); color: var(--lime); border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; }
 .profile__hotel { grid-column: 1 / -1; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; padding-top: 14px; border-top: 1px solid #2a2a2a; }
 .profile__hotel div:first-child { grid-column: 1 / -1; }
 .profile__hotel dt { color: #9a9a93; font-size: 12px; margin-bottom: 2px; }
