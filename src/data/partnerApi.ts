@@ -1,38 +1,30 @@
 import type { RoleId } from './roles';
 
-export interface HotelUser {
-  id: string;
-  name: string;
-  role_id: RoleId;
-}
-
 export type Lookup = { email: string } | { hotelId: string };
 
+export interface PartnerSession {
+  token: string;
+  user: { id: string; name: string; role_id: RoleId; hotel_id: string };
+}
+
 /**
- * STEP 1: find the users who can log in to a hotel.
- * MOCK DATA — replace with POST /auth/partner/login { hotelId } (backend returns { step: 2, users }).
- * The backend has no email lookup yet, so the `email` branch needs a new endpoint.
+ * STEP 1: check that the property exists.
+ * MOCK DATA — replace with a real lookup. The backend's POST /auth/partner/login only
+ * understands { hotelId } today; the `email` branch needs a new endpoint.
+ * Do not return the list of staff here: users type their own User ID in step 2.
  */
-export async function findHotelUsers(_lookup: Lookup): Promise<{ hotelName: string; users: HotelUser[] }> {
+export async function findHotel(_lookup: Lookup): Promise<{ hotelName: string }> {
   await new Promise((r) => setTimeout(r, 600));
-  return {
-    hotelName: 'Hotel Empire',
-    users: [
-      { id: 'pu1', name: 'Empire Admin', role_id: 'prole1' },
-      { id: 'pu2', name: 'Priya Nair', role_id: 'prole2' },
-      { id: 'pu3', name: 'Rahul Verma', role_id: 'prole3' },
-      { id: 'pu4', name: 'Meena Das', role_id: 'prole4' },
-      { id: 'pu5', name: 'Arjun Rao', role_id: 'prole5' },
-    ],
-  };
+  return { hotelName: 'Hotel Empire' };
 }
 
 /**
  * STEP 2: log in as one user.
  * MOCK — replace with POST /auth/partner/login { hotelId, userId, userPassword }.
- * On success the backend returns { token, user: { id, name, role_id, hotel_id } }.
+ * On success the backend returns { token, user: { id, name, role_id, hotel_id } }; the
+ * role_id (see ./roles.ts) decides which features the dashboard shows.
  */
-export async function loginAsUser(_userId: string, _password: string): Promise<never> {
+export async function loginAsUser(_userId: string, _password: string): Promise<PartnerSession> {
   await new Promise((r) => setTimeout(r, 900));
   throw new Error('Login is not connected to the server yet.');
 }

@@ -3,10 +3,9 @@ import { Link } from 'react-router-dom';
 import Brand from '../components/Brand';
 import {
   AlertIcon, ArrowLeft, ArrowRight, EyeIcon, EyeOffIcon, HotelIdIcon, LockIcon, MailIcon,
-  ShieldIcon,
+  ShieldIcon, UserIcon,
 } from '../components/Icons';
-import { findHotelUsers, loginAsUser, type HotelUser, type Lookup } from '../data/partnerApi';
-import { ROLES } from '../data/roles';
+import { findHotel, loginAsUser, type Lookup } from '../data/partnerApi';
 
 const SUPPORT_NUMBER = '1800 313 2200';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -18,28 +17,26 @@ const METHODS: Record<Method, { tab: string; label: string; placeholder: string;
   email: { tab: 'Email', label: 'Email address', placeholder: 'you@property.com', empty: 'Enter your registered email', invalid: 'Enter a valid email address' },
   hotel: { tab: 'Hotel ID', label: 'Hotel ID', placeholder: 'e.g. CHK-EMPIRE-017', empty: 'Enter your Hotel ID', invalid: 'Hotel ID can have letters, numbers, - and _ only' },
 };
-
-const initials = (name: string) =>
-  name.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('');
+const USER_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,29}$/;
 
 export default function Login() {
   const [method, setMethod] = useState<Method>('email');
   const [identifier, setIdentifier] = useState('');
-  const [hotel, setHotel] = useState<{ name: string; users: HotelUser[] } | null>(null);
+  const [hotelName, setHotelName] = useState<string | null>(null);
 
-  const [userId, setUserId] = useState<string | null>(null);
+  const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
   const [remember, setRemember] = useState(true);
 
   const [idError, setIdError] = useState<string>();
+  const [userError, setUserError] = useState<string>();
   const [pwError, setPwError] = useState<string>();
   const [formError, setFormError] = useState<string>();
   const [loading, setLoading] = useState(false);
 
   const m = METHODS[method];
-  const step = hotel ? 2 : 1;
-  const selected = hotel?.users.find((u) => u.id === userId);
+  const step = hotelName ? 2 : 1;
 
   function switchMethod(next: Method) {
     if (next === method) return;
@@ -50,14 +47,15 @@ export default function Login() {
   }
 
   function startOver() {
-    setHotel(null);
-    setUserId(null);
+    setHotelName(null);
+    setUserId('');
     setPassword('');
+    setUserError(undefined);
     setPwError(undefined);
     setFormError(undefined);
   }
 
-  /** Step 1: identify the hotel, then show its users. */
+  /** Step 1: identify the property. */
   async function onContinue(e: FormEvent) {
     e.preventDefault();
     const value = identifier.trim();
@@ -69,12 +67,8 @@ export default function Login() {
     setLoading(true);
     try {
       const lookup: Lookup = method === 'email' ? { email: value } : { hotelId: value };
-      const res = await findHotelUsers(lookup);
-      if (!res.users.length) {
-        setFormError('No active users found for this property. Contact partner support.');
-        return;
-      }
-      setHotel({ name: res.hotelName, users: res.users });
+      const res = await findHotel(lookup);
+      setHotelName(res.hotelName);
     } catch {
       setFormError('We couldn’t find that property. Check the details and try again.');
     } finally {
@@ -82,18 +76,19 @@ export default function Login() {
     }
   }
 
-  /** Step 2: log in as the chosen user. */
+  /** Step 2: log in with User ID + password. */
   async function onLogin(e: FormEvent) {
     e.preventDefault();
     setFormError(undefined);
-    if (!userId) return setFormError('Select who is logging in');
-    const bad = !password ? 'Enter your password' : password.length < 4 ? 'Password is too short' : undefined;
-    setPwError(bad);
-    if (bad) return;
+    const uBad = !userId.trim() ? 'Enter your User ID' : !USER_ID_RE.test(userId.trim()) ? 'User ID can have letters, numbers, . - and _ only' : undefined;
+    const pBad = !password ? 'Enter your password' : password.length < 4 ? 'Password is too short' : undefined;
+    setUserError(uBad);
+    setPwError(pBad);
+    if (uBad || pBad) return;
 
     setLoading(true);
     try {
-      await loginAsUser(userId, password);
+      await loginAsUser(userId.trim(), password);
       // TODO: store the token + user.role_id, then navigate('/dashboard').
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Login failed. Please try again.');
@@ -116,11 +111,11 @@ export default function Login() {
         <p className="steps" aria-label={`Step ${step} of 2`}>
           <span className="steps__dot is-on" /><span className={`steps__dot${step === 2 ? ' is-on' : ''}`} />
         </p>
-        <h1>{step === 1 ? 'Welcome back' : 'Who’s logging in?'}</h1>
+        <h1>{step === 1 ? 'Welcome back' : 'Enter your User ID'}</h1>
         <p>
           {step === 1
             ? 'Find your property with your email or Hotel ID.'
-            : 'Choose your profile and enter your password. What you can access depends on your role.'}
+            : 'Log in with your own User ID and password. What you can access depends on your role.'}
         </p>
       </header>
 
@@ -169,12 +164,12 @@ export default function Login() {
         </form>
       )}
 
-      {step === 2 && hotel && (
+      {step === 2 && hotelName && (
         <form className="card card--dark login__card" onSubmit={onLogin} noValidate>
           <div className="hotel-chip">
             <span className="hotel-chip__icon"><HotelIdIcon size={18} /></span>
             <span className="hotel-chip__text">
-              <strong>{hotel.name}</strong>
+              <strong>{hotelName}</strong>
               <small>{identifier.trim()}</small>
             </span>
             <button type="button" className="link-lime" onClick={startOver}>Change</button>
@@ -182,37 +177,22 @@ export default function Login() {
 
           {formError && <div className="alert" role="alert"><AlertIcon /> {formError}</div>}
 
-          <div role="radiogroup" aria-label="Select user" className="users">
-            {hotel.users.map((u) => {
-              const role = ROLES[u.role_id];
-              const on = u.id === userId;
-              return (
-                <button
-                  key={u.id} type="button" role="radio" aria-checked={on}
-                  className={`user${on ? ' is-selected' : ''}`}
-                  onClick={() => { setUserId(u.id); setFormError(undefined); }}
-                >
-                  <span className="user__avatar">{initials(u.name)}</span>
-                  <span className="user__info">
-                    <strong>{u.name}</strong>
-                    <small>{role.name}</small>
-                  </span>
-                </button>
-              );
-            })}
+          <div className={`field${userError ? ' field--error' : ''}`}>
+            <label htmlFor="userId">User ID</label>
+            <div className="field__box">
+              <UserIcon />
+              <input
+                id="userId" type="text" autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                autoComplete="username" placeholder="e.g. pu1" value={userId}
+                onChange={(e) => { setUserId(e.target.value); setUserError(undefined); setFormError(undefined); }}
+                aria-invalid={!!userError} aria-describedby={userError ? 'user-err' : undefined}
+              />
+            </div>
+            {userError && <p className="field__error" id="user-err">{userError}</p>}
           </div>
 
-          {selected && (
-            <p className="role-note">
-              <ShieldIcon size={16} />
-              <span>
-                <b>{ROLES[selected.role_id].name}:</b> {ROLES[selected.role_id].description}
-              </span>
-            </p>
-          )}
-
           <div className={`field${pwError ? ' field--error' : ''}`}>
-            <label htmlFor="password">{selected ? `Password for ${selected.name.split(' ')[0]}` : 'Password'}</label>
+            <label htmlFor="password">Password</label>
             <div className="field__box">
               <LockIcon />
               <input

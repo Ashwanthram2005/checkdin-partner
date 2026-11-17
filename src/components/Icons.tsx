@@ -105,3 +105,10 @@ export const PhoneIcon = ({ size = 20 }: P) => (
     <path d="M11 18.5h2" />
   </svg>
 );
+
+export const UserIcon = ({ size = 20 }: P) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" {...stroke} aria-hidden="true">
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4.5 20.5c.8-3.6 3.7-5.5 7.5-5.5s6.7 1.9 7.5 5.5" />
+  </svg>
+);
