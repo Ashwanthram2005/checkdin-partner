@@ -5,7 +5,7 @@ const ITEMS = [
   { to: '/app/home', label: 'Home', icon: <HomeIcon /> },
   { to: '/bookings', label: 'Bookings', icon: <BookingsIcon /> },
   { to: '/pricing', label: 'Pricing', icon: <TagIcon /> },
-  { to: '/app/revenue', label: 'Revenue', icon: <ChartIcon /> },
+  { to: '/revenue', label: 'Revenue', icon: <ChartIcon /> },
   { to: '/app/more', label: 'More', icon: <MoreIcon /> },
 ];
 

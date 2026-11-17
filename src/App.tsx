@@ -4,6 +4,7 @@ import Bookings from './pages/Bookings';
 import Login from './pages/Login';
 import Placeholder from './pages/Placeholder';
 import Pricing from './pages/Pricing';
+import Revenue from './pages/Revenue';
 
 function Soon() {
   const { section = '' } = useParams();
@@ -16,6 +17,7 @@ export default function App() {
       <Route path="/" element={<Welcome />} />
       <Route path="/bookings" element={<Bookings />} />
       <Route path="/pricing" element={<Pricing />} />
+      <Route path="/revenue" element={<Revenue />} />
       <Route path="/app/:section" element={<Soon />} />
       <Route path="/dashboard" element={<Navigate to="/bookings" replace />} />
       <Route path="/login" element={<Login />} />

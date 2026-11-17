@@ -177,3 +177,16 @@ export const CheckCircleIcon = ({ size = 20 }: P) => (
 export const InfoIcon = ({ size = 16 }: P) => (
   <svg {...svgProps(size)}><circle cx="12" cy="12" r="8.500" /><path d="M12 11v5M12 7.800v.1" /></svg>
 );
+
+export const ArrowUpIcon = ({ size = 16 }: P) => (
+  <svg {...svgProps(size)}><path d="M12 19V5M6 11l6-6 6 6" /></svg>
+);
+export const BankIcon = ({ size = 20 }: P) => (
+  <svg {...svgProps(size)}><path d="M3.500 9.500L12 4l8.500 5.500M5.500 10.500v7M10 10.500v7M14 10.500v7M18.500 10.500v7M3.500 20h17" /></svg>
+);
+export const TableIcon = ({ size = 18 }: P) => (
+  <svg {...svgProps(size)}><rect x="3.500" y="4.500" width="17" height="15" rx="2.500" /><path d="M3.500 9.500h17M3.500 14.500h17M9.500 4.500v15" /></svg>
+);
+export const ChartBarIcon = ({ size = 18 }: P) => (
+  <svg {...svgProps(size)}><path d="M5 20v-7M10 20V5M15 20v-10M20 20H3.500" /></svg>
+);
