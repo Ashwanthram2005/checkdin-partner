@@ -197,7 +197,6 @@ export default function Login() {
                     <strong>{u.name}</strong>
                     <small>{role.name}</small>
                   </span>
-                  <span className={`user__level user__level--${role.level.toLowerCase()}`}>{role.level} access</span>
                 </button>
               );
             })}
