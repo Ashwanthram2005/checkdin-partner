@@ -91,3 +91,17 @@ export const ShieldIcon = ({ size = 18 }: P) => (
     <path d="M9 12l2.2 2.2L15.5 10" />
   </svg>
 );
+
+export const HotelIdIcon = ({ size = 20 }: P) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" {...stroke} aria-hidden="true">
+    <rect x="3" y="4" width="18" height="16" rx="3" />
+    <path d="M9.5 9L8 15M14 9l-1.5 6M7 11h9M6.5 13.5h9" />
+  </svg>
+);
+
+export const PhoneIcon = ({ size = 20 }: P) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" {...stroke} aria-hidden="true">
+    <rect x="7" y="2.5" width="10" height="19" rx="2.5" />
+    <path d="M11 18.5h2" />
+  </svg>
+);

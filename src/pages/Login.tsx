@@ -2,21 +2,39 @@ import { FormEvent, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Brand from '../components/Brand';
 import {
-  AlertIcon, ArrowLeft, ArrowRight, EyeIcon, EyeOffIcon, LockIcon, MailIcon, ShieldIcon,
+  AlertIcon, ArrowLeft, ArrowRight, EyeIcon, EyeOffIcon, HotelIdIcon, LockIcon, MailIcon,
+  PhoneIcon, ShieldIcon,
 } from '../components/Icons';
 
 const SUPPORT_NUMBER = '1800 313 2200';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^[6-9]\d{9}$/;
+const HOTEL_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{1,19}$/;
+
+type IdKind = 'email' | 'mobile' | 'hotel' | 'unknown';
+
+/** Works out whether the user typed an email, a mobile number or a Hotel ID. */
+function detectKind(raw: string): IdKind {
+  const v = raw.trim();
+  if (!v) return 'unknown';
+  if (v.includes('@')) return EMAIL_RE.test(v) ? 'email' : 'unknown';
+  const digits = v.replace(/[\s-]/g, '');
+  if (/^\d+$/.test(digits)) return PHONE_RE.test(digits) ? 'mobile' : 'unknown';
+  return HOTEL_ID_RE.test(v) ? 'hotel' : 'unknown';
+}
+
+const KIND_LABEL: Record<IdKind, string> = {
+  email: 'Email', mobile: 'Mobile number', hotel: 'Hotel ID', unknown: '',
+};
 
 type Errors = { id?: string; password?: string; form?: string };
 
 function validate(id: string, password: string): Errors {
   const errors: Errors = {};
   const value = id.trim();
-  if (!value) errors.id = 'Enter your registered email or mobile number';
-  else if (!EMAIL_RE.test(value) && !PHONE_RE.test(value.replace(/\s|-/g, '')))
-    errors.id = 'Enter a valid email or 10-digit mobile number';
+  if (!value) errors.id = 'Enter your email, mobile number or Hotel ID';
+  else if (detectKind(value) === 'unknown')
+    errors.id = 'Enter a valid email, 10-digit mobile number or Hotel ID';
   if (!password) errors.password = 'Enter your password';
   else if (password.length < 6) errors.password = 'Password must be at least 6 characters';
   return errors;
@@ -28,6 +46,7 @@ export default function Login() {
   const [show, setShow] = useState(false);
   const [remember, setRemember] = useState(true);
   const [errors, setErrors] = useState<Errors>({});
+  const kind = detectKind(id);
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: FormEvent) {
@@ -67,22 +86,28 @@ export default function Login() {
         )}
 
         <div className={`field${errors.id ? ' field--error' : ''}`}>
-          <label htmlFor="id">Email or mobile number</label>
+          <label htmlFor="id">Email, mobile or Hotel ID</label>
           <div className="field__box">
-            <MailIcon />
+            {kind === 'hotel' ? <HotelIdIcon /> : kind === 'mobile' ? <PhoneIcon /> : <MailIcon />}
             <input
               id="id"
               type="text"
-              inputMode="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               autoComplete="username"
-              placeholder="you@property.com"
+              placeholder="you@property.com or Hotel ID"
               value={id}
               onChange={(e) => { setId(e.target.value); setErrors((x) => ({ ...x, id: undefined, form: undefined })); }}
               aria-invalid={!!errors.id}
               aria-describedby={errors.id ? 'id-err' : undefined}
             />
           </div>
-          {errors.id && <p className="field__error" id="id-err">{errors.id}</p>}
+          {errors.id ? (
+            <p className="field__error" id="id-err">{errors.id}</p>
+          ) : kind !== 'unknown' ? (
+            <p className="field__hint">Signing in with {KIND_LABEL[kind]}</p>
+          ) : null}
         </div>
 
         <div className={`field${errors.password ? ' field--error' : ''}`}>
