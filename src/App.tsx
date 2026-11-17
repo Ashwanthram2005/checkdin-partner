@@ -1,5 +1,6 @@
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import Welcome from './pages/Welcome';
+import Bookings from './pages/Bookings';
 import Login from './pages/Login';
 import Placeholder from './pages/Placeholder';
 
@@ -7,6 +8,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Welcome />} />
+      <Route path="/bookings" element={<Bookings />} />
+      <Route path="/dashboard" element={<Navigate to="/bookings" replace />} />
       <Route path="/login" element={<Login />} />
       <Route path="/forgot-password" element={<Placeholder title="Reset Password" />} />
       <Route path="/register" element={<Placeholder title="List Your Property" />} />

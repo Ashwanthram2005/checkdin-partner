@@ -112,3 +112,33 @@ export const UserIcon = ({ size = 20 }: P) => (
     <path d="M4.5 20.5c.8-3.6 3.7-5.5 7.5-5.5s6.7 1.9 7.5 5.5" />
   </svg>
 );
+
+const svgProps = (size: number) => ({ width: size, height: size, viewBox: '0 0 24 24', ...stroke, 'aria-hidden': true as const });
+
+export const CalendarIcon = ({ size = 18 }: P) => (
+  <svg {...svgProps(size)}><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></svg>
+);
+export const ClockIcon = ({ size = 18 }: P) => (
+  <svg {...svgProps(size)}><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
+);
+export const CheckInIcon = ({ size = 18 }: P) => (
+  <svg {...svgProps(size)}><path d="M14 4h4a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 18 20h-4M3.5 12H14M10.5 8L14.5 12l-4 4" /></svg>
+);
+export const CheckOutIcon = ({ size = 18 }: P) => (
+  <svg {...svgProps(size)}><path d="M10 4H6a1.5 1.5 0 0 0-1.5 1.5v13A1.5 1.5 0 0 0 6 20h4M20.5 12H10M16.5 8l4 4-4 4" /></svg>
+);
+export const UsersIcon = ({ size = 18 }: P) => (
+  <svg {...svgProps(size)}><circle cx="9" cy="8.5" r="3.5" /><path d="M2.5 20c.6-3.4 3.2-5 6.5-5s5.900 1.600 6.500 5M16 5.200a3.500 3.500 0 0 1 0 6.600M18 15.300c1.900.7 3.100 2.300 3.500 4.700" /></svg>
+);
+export const XCircleIcon = ({ size = 18 }: P) => (
+  <svg {...svgProps(size)}><circle cx="12" cy="12" r="8.5" /><path d="M9 9l6 6M15 9l-6 6" /></svg>
+);
+export const DownloadIcon = ({ size = 18 }: P) => (
+  <svg {...svgProps(size)}><path d="M12 4v11M7.500 10.500L12 15l4.500-4.500M4.500 19.500h15" /></svg>
+);
+export const SearchIcon = ({ size = 18 }: P) => (
+  <svg {...svgProps(size)}><circle cx="11" cy="11" r="6.500" /><path d="M16 16l4 4" /></svg>
+);
+export const ChevronDown = ({ size = 18 }: P) => (
+  <svg {...svgProps(size)}><path d="M6 9.500l6 6 6-6" /></svg>
+);
