@@ -58,6 +58,16 @@ Until then the app alerts only while it is open.
 * **In-app messaging** (Messages): chat with guests inside the app, quick templates, unread badges, new-message alerts.
   It needs the server endpoints in `docs/MESSAGING_API.md` (patch in `docs/backend-messaging/`) and a chat screen in the guest app.
 
+## Changes in v0.5
+* **Hotel details**: name, description, address, PIN, map link, contact phone/email and logo (same validation as the partner site).
+  Legal name, PAN, GST and bank stay desktop-only.
+* **Team**: staff list and what each role can do (view only; staff are added through Checkdin support).
+* **Activity log** and **Support tickets**: read from `audit-log` and `support`.
+* **Properties**: list of properties; "switch" signs out and opens sign-in on the Hotel ID tab (most data is scoped to the signed-in property).
+* **Activate account / Reset password**: open from the email link (`/activate?token=…`, `/reset-password?token=…`) or by pasting the link;
+  Android opens those partner.checkdin.in links in the app (not verified app links, so Android may ask which app to use).
+* **Rules & policies is not built**: on the partner site its "Save" does not save anything (no server call), so there is nothing real to show.
+
 ## Platform fee (as told by the owner)
 Checkdin's fee is **₹79 + 18% GST (₹93.22) per stay booking**, taken from the property's earnings.
 **Extension (stay-longer) charges carry no platform fee.** `src/lib/fees.ts` holds the numbers; Revenue, Reports,

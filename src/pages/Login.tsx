@@ -45,6 +45,12 @@ export default function Login() {
   const m = METHODS[method];
   const stepNo = step === 'lookup' ? 1 : step === 'account' ? 2 : 3;
 
+  // coming from "switch property": start on the Hotel ID tab with the ID filled in
+  useEffect(() => {
+    const id = (location.state as { hotelId?: string } | null)?.hotelId;
+    if (id) { setMethod('hotel'); setIdentifier(id); }
+  }, [location.state]);
+
   // already signed in → go straight to the app
   useEffect(() => {
     if (session) navigate('/home', { replace: true });
@@ -232,7 +238,7 @@ export default function Login() {
       )}
 
       <footer className="welcome__help">
-        New to Checkdin? Register through the onboarding portal — after approval you get an activation email.
+        New to Checkdin? Register through the onboarding portal — after approval you get an activation email.<br />Got that email? <Link to="/activate" className="link-lime-dark">Activate your account</Link>.
         <br />Need help? Call <a href={`tel:${SUPPORT_NUMBER.replace(/\s/g, '')}`}>{SUPPORT_NUMBER}</a>, available 24&nbsp;×&nbsp;7.
       </footer>
     </main>

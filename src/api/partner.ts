@@ -258,6 +258,16 @@ export interface PropertySettings {
   description: string;
   amenities: string[];
   images: PhotoItem[];
+  legalName: string;
+  timezone: string;
+  language: string;
+  currency: string;
+  logoUrl: string | null;
+  state: string;
+  pincode: string;
+  mapsUrl: string;
+  contactPhone: string;
+  contactEmail: string;
   banking: { status: string; bankName: string; accountLast4: string; panStatus: string; gstStatus: string };
   account: { email: string; phone: string; partnerName: string; partnerStatus: string };
 }
@@ -279,6 +289,9 @@ export async function getPropertySettings(id: string): Promise<PropertySettings>
     propertyId: String(s.propertyId ?? id), name: String(s.name ?? ''), address: String(s.address ?? ''), city: String(s.city ?? ''),
     autoAcceptBookings: !!s.autoAcceptBookings, pauseBookings: !!s.pauseBookings,
     description: String(s.description ?? ''),
+    legalName: String(s.legalName ?? ''), timezone: String(s.timezone ?? ''), language: String(s.language ?? ''), currency: String(s.currency ?? ''),
+    logoUrl: s.logoUrl ? String(s.logoUrl) : null, state: String(s.state ?? ''), pincode: String(s.pincode ?? ''), mapsUrl: String(s.mapsUrl ?? ''),
+    contactPhone: String(s.contactPhone ?? ''), contactEmail: String(s.contactEmail ?? ''),
     amenities: Array.isArray(s.amenities) ? (s.amenities as unknown[]).map(String) : [],
     images: toPhotos(s.images),
     banking: {
@@ -288,7 +301,7 @@ export async function getPropertySettings(id: string): Promise<PropertySettings>
     account: { email: String(a.email ?? ''), phone: String(a.phone ?? ''), partnerName: String(a.partnerName ?? ''), partnerStatus: String(a.partnerStatus ?? '') },
   };
 }
-export const updatePropertySettings = (id: string, patch: Partial<Pick<PropertySettings, 'autoAcceptBookings' | 'pauseBookings' | 'amenities' | 'description'>>) =>
+export const updatePropertySettings = (id: string, patch: Partial<Pick<PropertySettings, 'autoAcceptBookings' | 'pauseBookings' | 'amenities' | 'description' | 'name' | 'address' | 'city' | 'state' | 'pincode' | 'mapsUrl' | 'contactPhone' | 'contactEmail'>>) =>
   api<unknown>(`/api/partner/properties/${enc(id)}/settings`, { method: 'PUT', body: patch });
 
 /* ───────────── payouts ───────────── */
@@ -394,3 +407,54 @@ export const sendChatMessage = (bookingId: string, body: string) =>
   api<unknown>(`/api/partner/bookings/${enc(bookingId)}/messages`, { method: 'POST', body: { body } });
 export const markThreadRead = (bookingId: string) =>
   api<unknown>(`/api/partner/bookings/${enc(bookingId)}/messages/read`, { method: 'POST', body: {} });
+
+/* ───────────── logo ───────────── */
+
+export const uploadLogo = (id: string, dataUrl: string) =>
+  api<Raw>(`/api/partner/properties/${enc(id)}/logo`, { method: 'POST', body: { dataUrl } });
+export const removeLogo = (id: string) =>
+  api<Raw>(`/api/partner/properties/${enc(id)}/logo`, { method: 'DELETE' });
+
+/* ───────────── team, activity log, support ───────────── */
+
+export interface StaffMember { id: string; name: string; roleId: string; roleName: string; phone: string; active: boolean; lastLogin: Date | null }
+export const getStaff = async (propertyId: string): Promise<StaffMember[]> =>
+  unwrap<Raw>(await api(`/api/partner/properties/${enc(propertyId)}/staff`)).map((r) => ({
+    id: String(r.id), name: String(r.name ?? ''), roleId: String(r.roleId ?? r.role_id ?? ''), roleName: String(r.roleName ?? r.role_name ?? ''),
+    phone: String(r.phone ?? ''), active: r.active !== false, lastLogin: date(r.lastLogin ?? r.last_login),
+  }));
+
+export interface AuditEntry { id: string; action: string; actor: string; role: string; category: string; target: string; at: Date | null }
+export const getAuditLog = async (): Promise<AuditEntry[]> =>
+  unwrap<Raw>(await api('/api/partner/audit-log')).map((r, i) => ({
+    id: String(r.id ?? i), action: String(r.action ?? ''), actor: String(r.actor ?? r.user ?? ''), role: String(r.role ?? ''),
+    category: String(r.category ?? 'General'), target: String(r.target ?? r.detail ?? ''), at: date(r.at ?? r.created_at),
+  })).sort((a, b) => (b.at?.getTime() ?? 0) - (a.at?.getTime() ?? 0));
+
+export interface Ticket { id: string; reference: string; subject: string; category: string; priority: string; status: string; updatedAt: Date | null; createdAt: Date | null }
+export const getTickets = async (): Promise<Ticket[]> =>
+  unwrap<Raw>(await api('/api/partner/support')).map((r, i) => ({
+    id: String(r.id ?? i), reference: String(r.reference ?? r.id ?? ''), subject: String(r.subject ?? ''), category: String(r.category ?? ''),
+    priority: String(r.priority ?? ''), status: String(r.status ?? ''), updatedAt: date(r.updated_at ?? r.updatedAt), createdAt: date(r.created_at ?? r.createdAt),
+  })).sort((a, b) => (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0));
+
+/* ───────────── activate account / reset password (opened from an email link) ───────────── */
+
+export type LinkStatus = 'valid' | 'used' | 'expired' | 'invalid' | 'unknown';
+const toStatus = (v: unknown): LinkStatus => (v === 'valid' || v === 'used' || v === 'expired' || v === 'invalid' ? v : 'unknown');
+
+export async function activationStatus(token: string): Promise<{ status: LinkStatus; accountActive: boolean }> {
+  try {
+    const r = await api<Raw>('/api/auth/partner/activate/status', { method: 'POST', body: { token }, auth: false });
+    return { status: toStatus(r?.status), accountActive: !!r?.accountActive };
+  } catch { return { status: 'unknown', accountActive: false }; }
+}
+export const activateAccount = (token: string, password: string, name?: string) =>
+  api<Raw>('/api/auth/partner/activate', { method: 'POST', body: { token, password, ...(name ? { name } : {}) }, auth: false });
+
+export async function resetStatus(token: string): Promise<LinkStatus> {
+  try { return toStatus((await api<Raw>('/api/auth/partner/reset-password/status', { method: 'POST', body: { token }, auth: false }))?.status); }
+  catch { return 'unknown'; }
+}
+export const resetPassword = (token: string, password: string, confirmPassword: string) =>
+  api<unknown>('/api/auth/partner/reset-password', { method: 'POST', body: { token, password, confirmPassword }, auth: false });

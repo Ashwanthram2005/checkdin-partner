@@ -220,3 +220,13 @@ export const RefreshIcon = ({ size = 18 }: P) => (
 export const SendIcon = ({ size = 20 }: P) => (
   <svg {...svgProps(size)}><path d="M20.500 3.500L10 14M20.500 3.500l-6.500 17-3.500-6.500L4 10.500l16.500-7z" /></svg>
 );
+
+export const ListIcon = ({ size = 20 }: P) => (
+  <svg {...svgProps(size)}><path d="M8.500 6.500H20M8.500 12H20M8.500 17.500H20M4 6.500h.01M4 12h.01M4 17.500h.01" /></svg>
+);
+export const LifebuoyIcon = ({ size = 20 }: P) => (
+  <svg {...svgProps(size)}><circle cx="12" cy="12" r="8.500" /><circle cx="12" cy="12" r="3.500" /><path d="M6 6l3.500 3.500M14.500 14.500L18 18M18 6l-3.500 3.500M9.500 14.500L6 18" /></svg>
+);
+export const StoreIcon = ({ size = 20 }: P) => (
+  <svg {...svgProps(size)}><path d="M4 9.500l1.500-5h13l1.500 5M4 9.500a2.700 2.700 0 0 0 5.300 0 2.700 2.700 0 0 0 5.400 0 2.700 2.700 0 0 0 5.300 0M5.500 12.500V20h13v-7.500M10 20v-4.500h4V20" /></svg>
+);

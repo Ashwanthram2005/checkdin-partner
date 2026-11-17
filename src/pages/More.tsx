@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
 import {
-  AlertIcon, BankIcon, FileTextIcon, BellIcon, CameraIcon, CalendarIcon, CheckCircleIcon, ClockIcon, MessageIcon, ReportIcon, StarIcon, CheckOutIcon, ChevronRightSm, CloseIcon, EyeIcon, EyeOffIcon, HelpIcon, HotelIdIcon,
+  AlertIcon, BankIcon, FileTextIcon, ListIcon, StoreIcon, BellIcon, CameraIcon, CalendarIcon, CheckCircleIcon, ClockIcon, MessageIcon, ReportIcon, StarIcon, CheckOutIcon, ChevronRightSm, CloseIcon, EyeIcon, EyeOffIcon, HelpIcon, HotelIdIcon,
   LockIcon, PhoneIcon, ShieldIcon, UserIcon,
 } from '../components/Icons';
 import { changePassword, getPropertySettings, updatePropertySettings } from '../api/partner';
@@ -13,8 +13,16 @@ import { initials } from '../lib/format';
 import '../styles/bookings.css';
 import '../styles/more.css';
 
-const VERSION = '0.4.0';
+const VERSION = '0.5.0';
 const PORTAL = 'https://partner.checkdin.in';
+
+const PROPERTY_MENU = [
+  { to: '/hotel', label: 'Hotel details', hint: 'Description, contact, address and logo', icon: <HotelIdIcon /> },
+  { to: '/property', label: 'Photos & amenities', hint: 'What guests see on your listing', icon: <CameraIcon /> },
+  { to: '/team', label: 'Team', hint: 'Who can sign in and what they can do', icon: <UserIcon /> },
+  { to: '/activity', label: 'Activity log', hint: 'Who did what at your property', icon: <ListIcon /> },
+  { to: '/properties', label: 'Properties', hint: 'Every property on your account', icon: <StoreIcon /> },
+];
 
 const MANAGE = [
   { to: '/extensions', label: 'Extensions', hint: 'Guests asking to stay longer', icon: <ClockIcon /> },
@@ -23,7 +31,6 @@ const MANAGE = [
   { to: '/messages', label: 'Messages', hint: 'Chat with your guests in the app', icon: <MessageIcon /> },
   { to: '/notifications', label: 'Notifications', hint: 'Bookings, check-ins and requests', icon: <BellIcon /> },
   { to: '/reports', label: 'Reports & forecast', hint: 'Revenue, stay lengths, guests', icon: <ReportIcon /> },
-  { to: '/property', label: 'Photos & amenities', hint: 'What guests see on your listing', icon: <CameraIcon /> },
 ];
 
 export default function More() {
@@ -86,20 +93,23 @@ export default function More() {
           ))}
         </ul>
 
+        <h2 className="group">Your property</h2>
+        <ul className="list manage">
+          {PROPERTY_MENU.map((m) => (
+            <li key={m.to}><Link to={m.to} className="row row--link">
+              <span className="row__icon">{m.icon}</span>
+              <span className="row__text"><strong>{m.label}</strong><small>{m.hint}</small></span>
+              <ChevronRightSm />
+            </Link></li>
+          ))}
+        </ul>
+
         <h2 className="group">Status</h2>
         <ul className="list">
           <SwitchRow icon={<HotelIdIcon />} label={s?.pauseBookings ? 'Offline' : 'Online'} hint={s?.pauseBookings ? 'You’re offline. Guests can’t book your slots right now.' : 'You’re online. Guests can book your slots.'}
             checked={!!s && !s.pauseBookings} disabled={!s || !canEdit || saving === 'pauseBookings'} onChange={(v) => toggle('pauseBookings', !v)} />
         </ul>
         {!canEdit && <p className="locked"><ShieldIcon size={16} /> Your role can’t change your online status.</p>}
-
-        <h2 className="group">Property</h2>
-        <ul className="list">
-          <li className="row">
-            <span className="row__icon"><HotelIdIcon /></span>
-            <span className="row__text"><strong>{s?.name ?? property?.name ?? 'Property'}</strong><small>{s?.address || s?.city || 'No address on file'}</small></span>
-          </li>
-        </ul>
 
         {can('finance') && (
           <>
@@ -131,6 +141,11 @@ export default function More() {
           <ChevronRightSm />
         </a>
         <ul className="list">
+          <li><Link to="/support" className="row row--link">
+            <span className="row__icon"><HelpIcon /></span>
+            <span className="row__text"><strong>Support tickets</strong><small>Your requests to Checkdin</small></span>
+            <ChevronRightSm />
+          </Link></li>
           <li><a className="row row--link" href={PORTAL} target="_blank" rel="noreferrer">
             <span className="row__icon"><HelpIcon /></span>
             <span className="row__text"><strong>Open the partner portal</strong><small>Change PAN, GST and bank details (on a computer)</small></span>
