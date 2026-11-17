@@ -6,7 +6,7 @@ const ITEMS = [
   { to: '/bookings', label: 'Bookings', icon: <BookingsIcon /> },
   { to: '/pricing', label: 'Pricing', icon: <TagIcon /> },
   { to: '/revenue', label: 'Revenue', icon: <ChartIcon /> },
-  { to: '/app/more', label: 'More', icon: <MoreIcon /> },
+  { to: '/more', label: 'More', icon: <MoreIcon /> },
 ];
 
 export default function BottomNav() {

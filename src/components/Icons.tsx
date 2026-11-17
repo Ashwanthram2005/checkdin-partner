@@ -190,3 +190,19 @@ export const TableIcon = ({ size = 18 }: P) => (
 export const ChartBarIcon = ({ size = 18 }: P) => (
   <svg {...svgProps(size)}><path d="M5 20v-7M10 20V5M15 20v-10M20 20H3.500" /></svg>
 );
+
+export const BellIcon = ({ size = 20 }: P) => (
+  <svg {...svgProps(size)}><path d="M6 17.500h12l-1.500-2V11a4.500 4.500 0 0 0-9 0v4.500L6 17.500zM10 20.500h4" /></svg>
+);
+export const HelpIcon = ({ size = 20 }: P) => (
+  <svg {...svgProps(size)}><circle cx="12" cy="12" r="8.500" /><path d="M9.700 9.600a2.400 2.400 0 1 1 3.400 2.200c-.7.400-1.100.9-1.100 1.700M12 16.600v.1" /></svg>
+);
+export const FileTextIcon = ({ size = 20 }: P) => (
+  <svg {...svgProps(size)}><path d="M7 3.500h6.500L18.500 8.500V19a1.500 1.500 0 0 1-1.500 1.500H7A1.500 1.500 0 0 1 5.500 19V5A1.500 1.500 0 0 1 7 3.500zM13 3.800V9h5M8.500 13h7M8.500 16.500h7" /></svg>
+);
+export const VolumeIcon = ({ size = 20 }: P) => (
+  <svg {...svgProps(size)}><path d="M4.500 9.500h3L12 5.500v13l-4.500-4h-3zM15.500 9a4 4 0 0 1 0 6M18 6.800a7.500 7.500 0 0 1 0 10.400" /></svg>
+);
+export const ChevronRightSm = ({ size = 18 }: P) => (
+  <svg {...svgProps(size)}><path d="M9 5.500l6.500 6.500L9 18.500" /></svg>
+);
