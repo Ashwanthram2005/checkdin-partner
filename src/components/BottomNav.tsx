@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { BookingsIcon, ChartIcon, HomeIcon, MoreIcon, TagIcon } from './Icons';
 
 const ITEMS = [
-  { to: '/app/home', label: 'Home', icon: <HomeIcon /> },
+  { to: '/home', label: 'Home', icon: <HomeIcon /> },
   { to: '/bookings', label: 'Bookings', icon: <BookingsIcon /> },
   { to: '/pricing', label: 'Pricing', icon: <TagIcon /> },
   { to: '/revenue', label: 'Revenue', icon: <ChartIcon /> },

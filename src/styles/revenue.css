@@ -92,3 +92,8 @@
 .pill--paid { background: #e7f8ec; color: #1a7f37; border-color: #b6e3c4; }
 .pill--processing { background: #fff6e0; color: #9a6700; border-color: #f3dc9b; }
 .pill--scheduled { background: #e8f1ff; color: #1d4ed8; border-color: #bfd4fb; }
+
+.plist__row { display: flex; align-items: center; gap: 10px; padding: 14px 16px; }
+.pill--paid, .pill--completed, .pill--settled, .pill--success { background: #e7f8ec; color: #1a7f37; border-color: #b6e3c4; }
+.pill--pending, .pill--on-process, .pill--processing, .pill--requested { background: #fff6e0; color: #9a6700; border-color: #f3dc9b; }
+.pill--failed, .pill--rejected { background: #fdecec; color: #c62828; border-color: #f5c2c2; }

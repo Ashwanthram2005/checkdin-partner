@@ -46,3 +46,11 @@
 .dialog__body h2 { font-size: 20px; font-weight: 800; }
 .dialog__body p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.45; }
 .dialog .sheet__foot .abtn--ghost { flex: 1; }
+
+.row--btn { width: 100%; background: none; border: 0; font: inherit; text-align: left; cursor: pointer; }
+.pw-field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.pw-field input { height: 48px; border: 1.5px solid var(--line); border-radius: 12px; padding: 0 14px; font: inherit; font-size: 16px; color: var(--ink); }
+.pw-field input:focus { outline: none; border-color: var(--ink); }
+.pw-show { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; color: var(--ink); padding: 4px 0; }
+.alert--light { color: #c62828; background: #fdecec; border-color: #f5c2c2; }
+.sheet__body > * + * { margin-top: 0; }

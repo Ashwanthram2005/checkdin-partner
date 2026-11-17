@@ -1,31 +1,31 @@
-import { Navigate, Route, Routes, useParams } from 'react-router-dom';
-import Welcome from './pages/Welcome';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import { RequireAuth } from './auth/AuthContext';
 import Bookings from './pages/Bookings';
+import ExtensionsPage from './pages/ExtensionsPage';
+import ForgotPassword from './pages/ForgotPassword';
+import Home from './pages/Home';
 import Login from './pages/Login';
 import More from './pages/More';
-import Placeholder from './pages/Placeholder';
 import Pricing from './pages/Pricing';
 import Revenue from './pages/Revenue';
+import Welcome from './pages/Welcome';
 
-function Soon() {
-  const { section = '' } = useParams();
-  return <Placeholder title={section.charAt(0).toUpperCase() + section.slice(1)} />;
-}
+const guard = (el: JSX.Element) => <RequireAuth>{el}</RequireAuth>;
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Welcome />} />
-      <Route path="/bookings" element={<Bookings />} />
-      <Route path="/pricing" element={<Pricing />} />
-      <Route path="/revenue" element={<Revenue />} />
-      <Route path="/more" element={<More />} />
-      <Route path="/app/:section" element={<Soon />} />
-      <Route path="/dashboard" element={<Navigate to="/bookings" replace />} />
       <Route path="/login" element={<Login />} />
-      <Route path="/forgot-password" element={<Placeholder title="Reset Password" />} />
-      <Route path="/register" element={<Placeholder title="List Your Property" />} />
-      <Route path="*" element={<Placeholder title="Page not found" />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/home" element={guard(<Home />)} />
+      <Route path="/bookings" element={guard(<Bookings />)} />
+      <Route path="/extensions" element={guard(<ExtensionsPage />)} />
+      <Route path="/pricing" element={guard(<Pricing />)} />
+      <Route path="/revenue" element={guard(<Revenue />)} />
+      <Route path="/more" element={guard(<More />)} />
+      <Route path="/dashboard" element={<Navigate to="/home" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

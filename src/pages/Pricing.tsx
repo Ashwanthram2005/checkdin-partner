@@ -1,166 +1,211 @@
 import { useEffect, useMemo, useState } from 'react';
 import BottomNav from '../components/BottomNav';
-import { CheckCircleIcon, ClockIcon, InfoIcon, MinusIcon, PlusIcon } from '../components/Icons';
+import { AlertIcon, CheckCircleIcon, InfoIcon, MinusIcon, PlusIcon } from '../components/Icons';
 import {
-  GST_HIGH_PCT, GST_LOW_PCT, GST_THRESHOLD, INITIAL_PRICING, PLATFORM_FEE, PLATFORM_FEE_TOTAL, PLATFORM_GST_PCT, SLOTS,
-  gstPctFor, guestPays, rateErrors, withPct, youEarn,
-  type Adjustments, type PricingState, type SlotHours,
-} from '../data/pricing';
+  SLOT_KEYS, SLOT_LABEL, getPricing, getPricingRules, updatePricing, updatePricingRules,
+  type Pricing, type PricingRule, type SlotKey,
+} from '../api/partner';
+import { useApi } from '../api/useApi';
+import { useAuth } from '../auth/AuthContext';
+import { gstAmount, gstPctFor, guestPays } from '../lib/gst';
+import { inr } from '../lib/format';
 import '../styles/bookings.css';
 import '../styles/pricing.css';
 
-const inr = (n: number) => '₹' + n.toLocaleString('en-IN');
 const STEP = 50;
-const clampPct = (n: number) => Math.min(50, Math.max(1, n));
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+const gstBadge = (base: number) => (gstPctFor(base) === 0 ? 'Exempt (0%)' : `${gstPctFor(base)}% GST`);
 
-export default function Pricing() {
-  const [saved, setSaved] = useState<PricingState>(INITIAL_PRICING);
-  const [draft, setDraft] = useState<PricingState>(INITIAL_PRICING);
+export default function PricingPage() {
+  const { can } = useAuth();
+  const editable = can('rooms') || can('finance');
+  const price = useApi(getPricing);
+  const rules = useApi(getPricingRules);
+
+  const [draft, setDraft] = useState<Pricing | null>(null);
+  const [draftRules, setDraftRules] = useState<PricingRule[] | null>(null);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
-  const errors = useMemo(() => rateErrors(draft.rates), [draft.rates]);
-  const hasErrors = Object.keys(errors).length > 0;
-  const a = draft.adjustments;
-
+  useEffect(() => { if (price.data) setDraft(price.data); }, [price.data]);
+  useEffect(() => { if (rules.data) setDraftRules(rules.data); }, [rules.data]);
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(false), 2600);
+    const t = setTimeout(() => setToast(null), 2600);
     return () => clearTimeout(t);
   }, [toast]);
 
-  const setRate = (h: SlotHours, value: number) =>
-    setDraft((d) => ({ ...d, rates: { ...d.rates, [h]: Math.max(0, Math.min(99999, value)) } }));
-  const setAdj = (patch: Partial<Adjustments>) => setDraft((d) => ({ ...d, adjustments: { ...d.adjustments, ...patch } }));
+  const priceDirty = !!draft && !!price.data && !same(draft, price.data);
+  const rulesDirty = !!draftRules && !!rules.data && !same(draftRules, rules.data);
+  const dirty = priceDirty || rulesDirty;
+
+  const errors = useMemo(() => {
+    const e: Partial<Record<SlotKey | 'fullDay', string>> = {};
+    if (!draft) return e;
+    for (const k of SLOT_KEYS) if (draft.active[k] && !(draft.base[k] > 0)) e[k] = 'Set a price, or turn this slot off';
+    if (draft.fullDay.active && draft.fullDay.price < 0) e.fullDay = 'Price cannot be negative';
+    return e;
+  }, [draft]);
+  const hasErrors = Object.keys(errors).length > 0;
+
+  const setBase = (k: SlotKey, v: number) => setDraft((d) => d && { ...d, base: { ...d.base, [k]: Math.max(0, Math.min(99999, v)) } });
+  const setActive = (k: SlotKey, v: boolean) => setDraft((d) => d && { ...d, active: { ...d.active, [k]: v } });
+  const setRule = (id: string, patch: Partial<PricingRule>) => setDraftRules((rs) => rs && rs.map((r) => (r.rule_id === id ? { ...r, ...patch } : r)));
 
   async function save() {
-    if (hasErrors || !dirty) return;
-    setSaving(true);
+    if (!dirty || hasErrors || !draft) return;
+    setSaving(true); setSaveError(null);
     try {
-      // TODO: send `draft` to the pricing API (PUT /partner/pricing), then store the response.
-      await new Promise((r) => setTimeout(r, 700));
-      setSaved(draft);
-      setToast(true);
-    } finally {
-      setSaving(false);
-    }
+      if (priceDirty) await updatePricing(draft);
+      if (rulesDirty && draftRules) await updatePricingRules(draftRules);
+      setToast('Prices saved');
+      price.reload(); rules.reload();
+    } catch (e) { setSaveError((e as Error).message); }
+    finally { setSaving(false); }
   }
+
+  const discard = () => { setDraft(price.data); setDraftRules(rules.data); setSaveError(null); };
+  const loadError = price.error || rules.error;
+  const weekend = (k: SlotKey) => (draft ? guestPays(Math.round(draft.base[k] * (1 + draft.weekendSurcharge / 100))) : 0);
+  const groups = draftRules ? [...new Set(draftRules.map((r) => r.group))] : [];
 
   return (
     <div className="app">
       <main className="bk pr">
         <header className="bk__bar">
-          <div>
-            <h1>Pricing</h1>
-            <p>Set the price for each slot</p>
-          </div>
+          <div><h1>Pricing</h1><p>Set one price per slot, without GST</p></div>
         </header>
 
-        <p className="pr__hint">
-          <InfoIcon /> Slots only: {SLOTS.join(', ')} hours. Prices are before GST. Checkdin charges a platform fee of {inr(PLATFORM_FEE)} + {PLATFORM_GST_PCT}% GST ({inr(PLATFORM_FEE_TOTAL)}) per booking, with no commission.
-        </p>
+        {loadError && <div className="alert" role="alert"><AlertIcon /> {loadError} <button type="button" className="link-btn" onClick={() => { price.reload(); rules.reload(); }}>Retry</button></div>}
+        {!editable && draft && <p className="pr__hint"><InfoIcon /> Your role can view prices but not change them.</p>}
 
-        <ul className="rates">
-          {SLOTS.map((h) => {
-            const rate = draft.rates[h];
-            const err = errors[h];
-            return (
-              <li key={h} className={`rate${err ? ' rate--error' : ''}`}>
-                <div className="rate__head">
-                  <span className="rate__icon"><ClockIcon size={18} /></span>
-                  <strong>{h} Hours</strong>
-                  {saved.rates[h] !== rate && <span className="rate__edited">Edited</span>}
-                </div>
-
-                <div className="stepper">
-                  <button type="button" className="stepper__btn" onClick={() => setRate(h, rate - STEP)} aria-label={`Decrease ${h} hour rate`}><MinusIcon /></button>
-                  <label className="stepper__field">
-                    <span>₹</span>
-                    <input
-                      inputMode="numeric" value={rate === 0 ? '' : String(rate)} placeholder="0"
-                      aria-label={`${h} hour rate`} aria-invalid={!!err}
-                      onChange={(e) => setRate(h, Number(e.target.value.replace(/\D/g, '')))}
-                    />
-                  </label>
-                  <button type="button" className="stepper__btn" onClick={() => setRate(h, rate + STEP)} aria-label={`Increase ${h} hour rate`}><PlusIcon /></button>
-                </div>
-
-                {err ? (
-                  <p className="rate__error" role="alert">{err}</p>
-                ) : (
-                  <>
-                    <dl className="rate__calc">
-                      <div><dt>Guest pays</dt><dd>{inr(guestPays(rate))}</dd><small>incl. {gstPctFor(rate)}% GST</small></div>
-                      <div><dt>Platform fee</dt><dd className="fee">−{inr(PLATFORM_FEE_TOTAL)}</dd></div>
-                      <div><dt>You earn</dt><dd className="earn">{inr(youEarn(rate))}</dd></div>
-                    </dl>
-                    {a.weekendOn && (
-                      <p className="rate__wk">Fri–Sun: {inr(withPct(rate, a.weekendPct))} <span>(guest pays {inr(guestPays(withPct(rate, a.weekendPct)))} incl. {gstPctFor(withPct(rate, a.weekendPct))}% GST)</span></p>
-                    )}
-                  </>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-        <p className="pr__fine">“You earn” is the slot price minus the {inr(PLATFORM_FEE)} + {PLATFORM_GST_PCT}% GST platform fee. The guest pays the slot price plus GST: {GST_LOW_PCT}% up to {inr(GST_THRESHOLD)}, {GST_HIGH_PCT}% above it.</p>
-
-        <section className="adj" aria-label="Price adjustments">
-          <h2>Adjustments</h2>
-          <p className="adj__sub">Applies to all slots</p>
-
-          <div className="adj__row">
-            <div className="adj__text">
-              <strong>Weekend rates</strong>
-              <small>Raise prices on Friday, Saturday and Sunday</small>
-            </div>
-            <label className="switch">
-              <input type="checkbox" role="switch" checked={a.weekendOn} onChange={(e) => setAdj({ weekendOn: e.target.checked })} aria-label="Weekend rates" />
-              <span className="switch__track" aria-hidden="true"><span className="switch__thumb" /></span>
-            </label>
-          </div>
-          {a.weekendOn && <PctStepper label="Weekend increase" value={a.weekendPct} sign="+" onChange={(v) => setAdj({ weekendPct: clampPct(v) })} />}
-
-          <div className="adj__row">
-            <div className="adj__text">
-              <strong>Last-minute discount</strong>
-              <small>Fill empty slots with a same-day offer</small>
-            </div>
-            <label className="switch">
-              <input type="checkbox" role="switch" checked={a.lastMinuteOn} onChange={(e) => setAdj({ lastMinuteOn: e.target.checked })} aria-label="Last-minute discount" />
-              <span className="switch__track" aria-hidden="true"><span className="switch__thumb" /></span>
-            </label>
-          </div>
-          {a.lastMinuteOn && <PctStepper label="Same-day discount" value={a.lastMinutePct} sign="−" onChange={(v) => setAdj({ lastMinutePct: clampPct(v) })} />}
+        <section className="slabs" aria-label="How GST is applied">
+          <p className="slabs__title">Enter your price without GST — Checkdin adds the right slab.</p>
+          <ul>
+            <li><span>Up to ₹1,000</span><b>Exempt — 0%</b></li>
+            <li><span>₹1,001 – ₹7,500</span><b>5% GST</b></li>
+            <li><span>Above ₹7,500</span><b>18% GST</b></li>
+          </ul>
+          <p className="slabs__note">Guests see the GST-inclusive amount; your payout is worked out on the base price.</p>
         </section>
+
+        {price.loading && !draft && <p className="muted-note">Loading prices…</p>}
+
+        {draft && (
+          <>
+            <ul className="rates">
+              {SLOT_KEYS.map((k) => {
+                const base = draft.base[k];
+                const err = errors[k];
+                const on = draft.active[k];
+                return (
+                  <li key={k} className={`rate${err ? ' rate--error' : ''}${on ? '' : ' rate--off'}`}>
+                    <div className="rate__head">
+                      <strong>{SLOT_LABEL[k]}</strong>
+                      {price.data && price.data.base[k] !== base && <span className="rate__edited">Edited</span>}
+                      <label className="switch rate__switch">
+                        <input type="checkbox" role="switch" checked={on} disabled={!editable} onChange={(e) => setActive(k, e.target.checked)} aria-label={`${SLOT_LABEL[k]} bookable`} />
+                        <span className="switch__track" aria-hidden="true"><span className="switch__thumb" /></span>
+                      </label>
+                    </div>
+                    <span className="gst-badge">{gstBadge(base)}</span>
+
+                    <div className="stepper">
+                      <button type="button" className="stepper__btn" disabled={!editable} onClick={() => setBase(k, base - STEP)} aria-label={`Decrease ${SLOT_LABEL[k]} price`}><MinusIcon /></button>
+                      <label className="stepper__field">
+                        <span>₹</span>
+                        <input inputMode="numeric" value={base === 0 ? '' : String(base)} placeholder="0" disabled={!editable} aria-label={`${SLOT_LABEL[k]} base price`} aria-invalid={!!err}
+                          onChange={(e) => setBase(k, Number(e.target.value.replace(/\D/g, '')))} />
+                      </label>
+                      <button type="button" className="stepper__btn" disabled={!editable} onClick={() => setBase(k, base + STEP)} aria-label={`Increase ${SLOT_LABEL[k]} price`}><PlusIcon /></button>
+                    </div>
+
+                    {err ? <p className="rate__error" role="alert">{err}</p> : (
+                      <dl className="rate__calc rate__calc--rows">
+                        <div><dt>Base</dt><dd>{inr(base)}</dd></div>
+                        <div><dt>GST ({gstPctFor(base)}%)</dt><dd>{gstAmount(base) ? inr(gstAmount(base)) : '—'}</dd></div>
+                        <div className="total"><dt>Guest pays</dt><dd>{inr(guestPays(base))}</dd></div>
+                        {draft.weekendSurcharge > 0 && <div><dt>Fri–Sun guest pays</dt><dd>{inr(weekend(k))}</dd></div>}
+                      </dl>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+
+            <section className="adj" aria-label="Adjustments">
+              <h2>Adjustments</h2>
+              <p className="adj__sub">Applied on top of the slot price, before GST.</p>
+              <div className="adj__row">
+                <div className="adj__text"><strong>Extra hour charge</strong><small>Charged when a guest stays beyond their slot.</small></div>
+                <label className="num-input"><span>₹</span><input inputMode="numeric" disabled={!editable} value={draft.extraHour || ''} placeholder="0" aria-label="Extra hour charge"
+                  onChange={(e) => setDraft({ ...draft, extraHour: Number(e.target.value.replace(/\D/g, '')) || 0 })} /></label>
+              </div>
+              <div className="adj__row">
+                <div className="adj__text"><strong>Weekend surcharge</strong><small>Added on Friday, Saturday and Sunday (0–50%).</small></div>
+                <label className="num-input"><input inputMode="numeric" disabled={!editable} value={draft.weekendSurcharge || ''} placeholder="0" aria-label="Weekend surcharge percent"
+                  onChange={(e) => setDraft({ ...draft, weekendSurcharge: Math.min(50, Number(e.target.value.replace(/\D/g, '')) || 0) })} /><span>%</span></label>
+              </div>
+            </section>
+
+            <section className="adj" aria-label="Full-day stay">
+              <div className="adj__row">
+                <div className="adj__text"><h2>Full-day stay</h2><small>Guests book whole nights. Leave the price at 0 if you don’t offer them.</small></div>
+                <label className="switch">
+                  <input type="checkbox" role="switch" checked={draft.fullDay.active} disabled={!editable} onChange={(e) => setDraft({ ...draft, fullDay: { ...draft.fullDay, active: e.target.checked } })} aria-label="Full-day stays bookable" />
+                  <span className="switch__track" aria-hidden="true"><span className="switch__thumb" /></span>
+                </label>
+              </div>
+              <div className="adj__row">
+                <div className="adj__text"><strong>Price per night</strong>{draft.fullDay.price === 0 && <small>Not offered</small>}</div>
+                <label className="num-input"><span>₹</span><input inputMode="numeric" disabled={!editable} value={draft.fullDay.price || ''} placeholder="0" aria-label="Full-day price per night"
+                  onChange={(e) => setDraft({ ...draft, fullDay: { ...draft.fullDay, price: Number(e.target.value.replace(/\D/g, '')) || 0 } })} /></label>
+              </div>
+              <div className="times">
+                <label>Check-in<input type="time" disabled={!editable} value={draft.fullDay.checkIn} onChange={(e) => setDraft({ ...draft, fullDay: { ...draft.fullDay, checkIn: e.target.value } })} /></label>
+                <label>Check-out<input type="time" disabled={!editable} value={draft.fullDay.checkOut} onChange={(e) => setDraft({ ...draft, fullDay: { ...draft.fullDay, checkOut: e.target.value } })} /></label>
+              </div>
+            </section>
+          </>
+        )}
+
+        {draftRules && draftRules.length > 0 && (
+          <section className="adj" aria-label="Dynamic pricing rules">
+            <h2>Dynamic pricing</h2>
+            <p className="adj__sub">Rules that move your slot price by time, day, season or demand.</p>
+            {groups.map((g) => (
+              <div key={g} className="rules">
+                <h3 className="rules__group">{g}</h3>
+                {draftRules.filter((r) => r.group === g).map((r) => (
+                  <div key={r.rule_id} className="rule">
+                    <div className="adj__text"><strong>{r.label}</strong><small>{r.window}</small></div>
+                    <div className="rule__ctl">
+                      <span className={`rule__pct${r.adjustment < 0 ? ' is-neg' : ''}`}>{r.adjustment > 0 ? '+' : ''}{r.adjustment}%</span>
+                      <label className="switch">
+                        <input type="checkbox" role="switch" checked={r.active} disabled={!editable} onChange={(e) => setRule(r.rule_id, { active: e.target.checked })} aria-label={`${r.label} rule`} />
+                        <span className="switch__track" aria-hidden="true"><span className="switch__thumb" /></span>
+                      </label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </section>
+        )}
       </main>
 
-      {(dirty || saving) && (
+      {editable && (dirty || saving) && (
         <div className="savebar" role="region" aria-label="Unsaved changes">
-          <button type="button" className="abtn abtn--ghost" onClick={() => setDraft(saved)} disabled={saving}>Discard</button>
-          <button type="button" className="abtn abtn--lime" onClick={save} disabled={hasErrors || saving}>
-            {saving ? 'Saving…' : hasErrors ? 'Fix errors to save' : 'Save changes'}
-          </button>
+          {saveError && <p className="savebar__err" role="alert">{saveError}</p>}
+          <div className="savebar__btns">
+            <button type="button" className="abtn abtn--ghost" onClick={discard} disabled={saving}>Discard</button>
+            <button type="button" className="abtn abtn--lime" onClick={save} disabled={hasErrors || saving}>{saving ? 'Saving…' : hasErrors ? 'Fix errors to save' : 'Save changes'}</button>
+          </div>
         </div>
       )}
-
-      {toast && <div className="toast" role="status"><CheckCircleIcon /> Prices saved</div>}
-
+      {toast && <div className="toast" role="status"><CheckCircleIcon /> {toast}</div>}
       <BottomNav />
-    </div>
-  );
-}
-
-function PctStepper({ label, value, sign, onChange }: { label: string; value: number; sign: string; onChange: (v: number) => void }) {
-  return (
-    <div className="pct">
-      <span>{label}</span>
-      <div className="stepper stepper--sm">
-        <button type="button" className="stepper__btn" onClick={() => onChange(value - 5)} aria-label={`Decrease ${label}`}><MinusIcon size={18} /></button>
-        <output className="pct__val" aria-label={label}>{sign}{value}%</output>
-        <button type="button" className="stepper__btn" onClick={() => onChange(value + 5)} aria-label={`Increase ${label}`}><PlusIcon size={18} /></button>
-      </div>
     </div>
   );
 }

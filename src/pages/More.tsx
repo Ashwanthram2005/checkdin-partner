@@ -1,55 +1,38 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { FormEvent, useEffect, useState, type ReactNode } from 'react';
 import BottomNav from '../components/BottomNav';
 import {
-  BankIcon, BellIcon, CheckOutIcon, ChevronRightSm, FileTextIcon, HelpIcon, HotelIdIcon, PhoneIcon,
-  ShieldIcon, UserIcon, UsersIcon, VolumeIcon,
+  AlertIcon, BankIcon, CheckCircleIcon, CheckOutIcon, ChevronRightSm, CloseIcon, EyeIcon, EyeOffIcon, HelpIcon, HotelIdIcon,
+  LockIcon, PhoneIcon, ShieldIcon, UserIcon,
 } from '../components/Icons';
-import { clearSession, useSession } from '../auth/session';
-import { can } from '../data/roles';
+import { changePassword, getPropertySettings, updatePropertySettings } from '../api/partner';
+import { useApi } from '../api/useApi';
+import { useAuth } from '../auth/AuthContext';
+import { SUPPORT_NUMBER } from '../config';
+import { initials } from '../lib/format';
 import '../styles/bookings.css';
 import '../styles/more.css';
 
-const SUPPORT_NUMBER = '1800 313 2200';
-const VERSION = '0.1.0';
-
-interface Row { to: string; label: string; hint: string; icon: ReactNode; permission?: string }
-
-const PROPERTY_ROWS: Row[] = [
-  { to: '/app/hotel-details', label: 'Hotel details', hint: 'Name, address, photos and amenities', icon: <HotelIdIcon /> },
-  { to: '/app/staff', label: 'Staff & roles', hint: 'Add users and choose what they can access', icon: <UsersIcon />, permission: 'staff' },
-  { to: '/app/bank', label: 'Bank account & KYC', hint: 'Payout account, PAN and GST', icon: <BankIcon />, permission: 'finance' },
-];
-
-const HELP_ROWS: Row[] = [
-  { to: '/app/help', label: 'Help centre', hint: 'Guides and answers to common questions', icon: <HelpIcon /> },
-  { to: '/app/terms', label: 'Terms & policies', hint: 'Partner agreement, privacy and cancellation', icon: <FileTextIcon /> },
-];
-
-type Prefs = { requests: boolean; reminders: boolean; payouts: boolean; sound: boolean };
-const DEFAULT_PREFS: Prefs = { requests: true, reminders: true, payouts: true, sound: true };
-const STORE = 'checkdin.partner.prefs';
-
-function loadPrefs(): Prefs {
-  try {
-    const raw = localStorage.getItem(STORE);
-    return raw ? { ...DEFAULT_PREFS, ...JSON.parse(raw) } : DEFAULT_PREFS;
-  } catch {
-    return DEFAULT_PREFS; // storage can be blocked (private mode, etc.)
-  }
-}
-
-const initials = (name: string) => name.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('');
+const VERSION = '0.2.0';
+const PORTAL = 'https://partner.checkdin.in';
 
 export default function More() {
-  const navigate = useNavigate();
-  const session = useSession();
-  const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
+  const { session, role, property, can, signOut } = useAuth();
+  const propertyId = session?.hotelId ?? '';
+  const settings = useApi(() => getPropertySettings(propertyId), [propertyId]);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
+  const [pwOpen, setPwOpen] = useState(false);
 
-  useEffect(() => {
-    try { localStorage.setItem(STORE, JSON.stringify(prefs)); } catch { /* ignore */ }
-  }, [prefs]);
+  const s = settings.data;
+  const canEdit = can('bookings');
+
+  async function toggle(key: 'autoAcceptBookings' | 'pauseBookings', value: boolean) {
+    setSaving(key); setError(null);
+    try { await updatePropertySettings(propertyId, { [key]: value }); settings.reload(); }
+    catch (e) { setError((e as Error).message); }
+    finally { setSaving(null); }
+  }
 
   useEffect(() => {
     if (!confirm) return;
@@ -58,68 +41,62 @@ export default function More() {
     return () => window.removeEventListener('keydown', onKey);
   }, [confirm]);
 
-  const allowed = (r: Row) => !r.permission || can(session.role, r.permission);
-  const property = PROPERTY_ROWS.filter(allowed);
-  const hidden = PROPERTY_ROWS.length - property.length;
-  const toggle = (k: keyof Prefs) => setPrefs((p) => ({ ...p, [k]: !p[k] }));
-
-  function logout() {
-    clearSession(); // TODO (real login): also drop the stored token
-    setConfirm(false);
-    navigate('/');
-  }
-
-  const toggles: { key: keyof Prefs; label: string; hint: string; icon: ReactNode }[] = [
-    { key: 'requests', label: 'New booking requests', hint: 'Alert me as soon as a guest asks to book', icon: <BellIcon /> },
-    { key: 'sound', label: 'Alert sound', hint: 'Play a sound for new requests', icon: <VolumeIcon /> },
-    { key: 'reminders', label: 'Check-in reminders', hint: 'Remind me before a guest arrives', icon: <BellIcon /> },
-    { key: 'payouts', label: 'Payout updates', hint: 'Tell me when money is on its way', icon: <BankIcon /> },
-  ];
+  const bankOk = !!s && s.banking.status.toLowerCase() !== 'pending' && !!s.banking.accountLast4;
 
   return (
     <div className="app">
       <main className="bk mo">
-        <header className="bk__bar">
-          <div>
-            <h1>More</h1>
-            <p>Your account and settings</p>
-          </div>
-        </header>
+        <header className="bk__bar"><div><h1>More</h1><p>Your account and settings</p></div></header>
 
         <section className="profile" aria-label="Your account">
-          <span className="profile__avatar" aria-hidden="true">{initials(session.name)}</span>
+          <span className="profile__avatar" aria-hidden="true">{initials(session?.name ?? '')}</span>
           <div className="profile__text">
-            <strong>{session.name}</strong>
-            <span className="role-pill">{session.role.name}</span>
+            <strong>{session?.name}</strong>
+            {role && <span className="role-pill">{role.name}</span>}
           </div>
           <dl className="profile__hotel">
-            <div><dt>Property</dt><dd>{session.hotelName}</dd></div>
-            <div><dt>Hotel ID</dt><dd>{session.hotelId}</dd></div>
-            <div><dt>User ID</dt><dd>{session.userId}</dd></div>
+            <div><dt>Property</dt><dd>{property?.name ?? s?.name ?? '—'}</dd></div>
+            <div><dt>Hotel ID</dt><dd>{session?.hotelId}</dd></div>
+            <div><dt>Status</dt><dd>{property?.status ?? '—'}</dd></div>
           </dl>
-          <p className="profile__access"><ShieldIcon size={16} /> {session.role.description}</p>
+          {role && <p className="profile__access"><ShieldIcon size={16} /> {role.description}</p>}
         </section>
+
+        {(error || settings.error) && <div className="alert" role="alert"><AlertIcon /> {error ?? settings.error} <button type="button" className="link-btn" onClick={() => { setError(null); settings.reload(); }}>Retry</button></div>}
+
+        <h2 className="group">Bookings</h2>
+        <ul className="list">
+          <SwitchRow icon={<HotelIdIcon />} label="Accepting new bookings" hint={s?.pauseBookings ? 'Paused — guests can’t book you right now' : 'Guests can book your slots'}
+            checked={!!s && !s.pauseBookings} disabled={!s || !canEdit || saving === 'pauseBookings'} onChange={(v) => toggle('pauseBookings', !v)} />
+          <SwitchRow icon={<CheckCircleIcon />} label="Auto-accept bookings" hint={s?.autoAcceptBookings ? 'New bookings are confirmed automatically' : 'You approve each booking'}
+            checked={!!s?.autoAcceptBookings} disabled={!s || !canEdit || saving === 'autoAcceptBookings'} onChange={(v) => toggle('autoAcceptBookings', v)} />
+        </ul>
+        {!canEdit && <p className="locked"><ShieldIcon size={16} /> Your role can’t change booking settings.</p>}
 
         <h2 className="group">Property</h2>
         <ul className="list">
-          {property.map((r) => <RowLink key={r.to} row={r} />)}
-        </ul>
-        {hidden > 0 && (
-          <p className="locked"><ShieldIcon size={16} /> {hidden} {hidden === 1 ? 'option is' : 'options are'} hidden for the {session.role.name} role. Ask the owner if you need access.</p>
-        )}
-
-        <h2 className="group">Notifications</h2>
-        <ul className="list">
-          {toggles.map((t) => (
-            <li key={t.key} className="row">
-              <span className="row__icon">{t.icon}</span>
-              <span className="row__text"><strong>{t.label}</strong><small>{t.hint}</small></span>
-              <label className="switch">
-                <input type="checkbox" role="switch" checked={prefs[t.key]} onChange={() => toggle(t.key)} aria-label={t.label} />
-                <span className="switch__track" aria-hidden="true"><span className="switch__thumb" /></span>
-              </label>
+          <li className="row">
+            <span className="row__icon"><HotelIdIcon /></span>
+            <span className="row__text"><strong>{s?.name ?? property?.name ?? 'Property'}</strong><small>{s?.address || s?.city || 'No address on file'}</small></span>
+          </li>
+          {can('finance') && (
+            <li className="row">
+              <span className="row__icon"><BankIcon /></span>
+              <span className="row__text">
+                <strong>Bank account &amp; KYC</strong>
+                <small>{s ? (bankOk ? `${s.banking.bankName} ••${s.banking.accountLast4}` : 'Bank account not verified yet') : 'Checking…'}{s ? ` · PAN ${s.banking.panStatus || '—'} · GST ${s.banking.gstStatus || '—'}` : ''}</small>
+              </span>
             </li>
-          ))}
+          )}
+        </ul>
+
+        <h2 className="group">Security</h2>
+        <ul className="list">
+          <li><button type="button" className="row row--link row--btn" onClick={() => setPwOpen(true)}>
+            <span className="row__icon"><LockIcon /></span>
+            <span className="row__text"><strong>Change password</strong><small>Use at least 8 characters with a letter and a number</small></span>
+            <ChevronRightSm />
+          </button></li>
         </ul>
 
         <h2 className="group">Help</h2>
@@ -129,12 +106,14 @@ export default function More() {
           <ChevronRightSm />
         </a>
         <ul className="list">
-          {HELP_ROWS.map((r) => <RowLink key={r.to} row={r} />)}
+          <li><a className="row row--link" href={PORTAL} target="_blank" rel="noreferrer">
+            <span className="row__icon"><HelpIcon /></span>
+            <span className="row__text"><strong>Open the partner portal</strong><small>Availability, reviews, reports and more</small></span>
+            <ChevronRightSm />
+          </a></li>
         </ul>
 
-        <button type="button" className="logout" onClick={() => setConfirm(true)}>
-          <CheckOutIcon /> Log out
-        </button>
+        <button type="button" className="logout" onClick={() => setConfirm(true)}><CheckOutIcon /> Log out</button>
         <p className="version">Checkdin Partner · v{VERSION}</p>
       </main>
 
@@ -148,27 +127,83 @@ export default function More() {
             <div className="dialog__body">
               <span className="dialog__icon"><UserIcon /></span>
               <h2 id="lo-title">Log out of Checkdin?</h2>
-              <p id="lo-desc">You’ll need your {session.hotelId} User ID and password to log back in.</p>
+              <p id="lo-desc">You’ll need your password to log back in.</p>
             </div>
             <footer className="sheet__foot">
               <button type="button" className="abtn abtn--ghost" onClick={() => setConfirm(false)}>Stay logged in</button>
-              <button type="button" className="abtn abtn--dark" onClick={logout}>Log out</button>
+              <button type="button" className="abtn abtn--dark" onClick={() => { setConfirm(false); signOut(); }}>Log out</button>
             </footer>
           </div>
         </div>
       )}
+
+      {pwOpen && <PasswordSheet onClose={() => setPwOpen(false)} />}
     </div>
   );
 }
 
-function RowLink({ row }: { row: Row }) {
+function SwitchRow({ icon, label, hint, checked, disabled, onChange }: { icon: ReactNode; label: string; hint: string; checked: boolean; disabled: boolean; onChange: (v: boolean) => void }) {
   return (
-    <li>
-      <Link to={row.to} className="row row--link">
-        <span className="row__icon">{row.icon}</span>
-        <span className="row__text"><strong>{row.label}</strong><small>{row.hint}</small></span>
-        <ChevronRightSm />
-      </Link>
+    <li className="row">
+      <span className="row__icon">{icon}</span>
+      <span className="row__text"><strong>{label}</strong><small>{hint}</small></span>
+      <label className="switch">
+        <input type="checkbox" role="switch" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} aria-label={label} />
+        <span className="switch__track" aria-hidden="true"><span className="switch__thumb" /></span>
+      </label>
     </li>
+  );
+}
+
+function PasswordSheet({ onClose }: { onClose: () => void }) {
+  const [cur, setCur] = useState('');
+  const [next, setNext] = useState('');
+  const [conf, setConf] = useState('');
+  const [show, setShow] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!cur) return setError('Enter your current password.');
+    if (next.length < 8 || !/[A-Za-z]/.test(next) || !/\d/.test(next)) return setError('New password must be at least 8 characters and include a letter and a number.');
+    if (next !== conf) return setError('New passwords do not match.');
+    setBusy(true); setError(null);
+    try { await changePassword(cur, next, conf); setDone(true); }
+    catch (err) { setError((err as Error).message); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <div className="sheet-wrap">
+      <button type="button" className="sheet-scrim" aria-label="Close" onClick={onClose} />
+      <div className="sheet" role="dialog" aria-modal="true" aria-label="Change password">
+        <div className="sheet__grab" aria-hidden="true" />
+        {done ? (
+          <>
+            <div className="dialog__body"><span className="dialog__icon"><CheckCircleIcon /></span><h2>Password updated</h2><p>Use your new password next time you sign in.</p></div>
+            <footer className="sheet__foot"><button type="button" className="abtn abtn--lime" onClick={onClose}>Done</button></footer>
+          </>
+        ) : (
+          <form onSubmit={submit} noValidate>
+            <header className="sheet__head"><h2>Change password</h2><button type="button" className="icon-btn icon-btn--sm" onClick={onClose} aria-label="Close"><CloseIcon /></button></header>
+            <div className="sheet__body">
+              {error && <div className="alert alert--light" role="alert"><AlertIcon /> {error}</div>}
+              {[['Current password', cur, setCur, 'current-password'], ['New password', next, setNext, 'new-password'], ['Confirm new password', conf, setConf, 'new-password']].map(([label, val, set, ac]) => (
+                <label key={label as string} className="pw-field">{label as string}
+                  <input type={show ? 'text' : 'password'} autoComplete={ac as string} value={val as string} onChange={(e) => { (set as (v: string) => void)(e.target.value); setError(null); }} />
+                </label>
+              ))}
+              <button type="button" className="link-btn pw-show" onClick={() => setShow((v) => !v)}>{show ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />} {show ? 'Hide' : 'Show'} passwords</button>
+            </div>
+            <footer className="sheet__foot">
+              <button type="button" className="abtn abtn--ghost" onClick={onClose}>Cancel</button>
+              <button type="submit" className="abtn abtn--lime" disabled={busy}>{busy ? 'Saving…' : 'Update password'}</button>
+            </footer>
+          </form>
+        )}
+      </div>
+    </div>
   );
 }

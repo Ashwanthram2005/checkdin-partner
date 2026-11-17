@@ -1,61 +1,47 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
+import CheckInSheet from '../components/CheckInSheet';
 import {
-  CalendarIcon, CheckInIcon, CheckOutIcon, ClockIcon, CloseIcon, DownloadIcon, FilterIcon,
-  PhoneIcon, SearchIcon, UsersIcon, XCircleIcon,
+  AlertIcon, ClockIcon, CloseIcon, DownloadIcon, FilterIcon, PhoneIcon, SearchIcon,
 } from '../components/Icons';
-import { BOOKINGS, demoBookings, STATUSES, type Booking, type BookingStatus } from '../data/bookings';
+import { getBookings, type Booking, type BookingStatus } from '../api/partner';
+import { useApi } from '../api/useApi';
+import { useAuth } from '../auth/AuthContext';
+import { dayKey, fmtDate, fmtTime, initials, inr } from '../lib/format';
 import '../styles/bookings.css';
 
 type Tab = 'All' | BookingStatus;
-const TABS: Tab[] = ['All', ...STATUSES];
+const TABS: Tab[] = ['All', 'Upcoming', 'Confirmed', 'Checked in', 'Completed', 'Cancelled'];
+const EXTRA_TABS: BookingStatus[] = ['Expired', 'No show'];
 
-interface Filters { from: string; to: string; duration: string; payment: string; status: string }
-const NO_FILTERS: Filters = { from: '', to: '', duration: 'all', payment: 'all', status: 'all' };
+interface Filters { from: string; to: string; stay: string; payment: string }
+const NO_FILTERS: Filters = { from: '', to: '', stay: 'all', payment: 'all' };
 
-const pad = (n: number) => String(n).padStart(2, '0');
-const dayKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-const fmtTime = (iso: string) => {
-  const d = new Date(iso);
-  const h = d.getHours() % 12 || 12;
-  return `${pad(h)}:${pad(d.getMinutes())} ${d.getHours() < 12 ? 'am' : 'pm'}`;
-};
-const inr = (n: number) => '₹' + n.toLocaleString('en-IN');
 const pillClass = (s: BookingStatus) => 'pill pill--' + s.toLowerCase().replace(/\s+/g, '-');
-
-function timeLeft(b: Booking, now: number) {
-  if (b.status !== 'Pending Approval' || !b.requestExpiresAt) return null;
-  const sec = Math.max(0, Math.floor((new Date(b.requestExpiresAt).getTime() - now) / 1000));
-  return `${Math.floor(sec / 60)}:${pad(sec % 60)}`;
-}
 
 function toCsv(rows: Booking[]) {
   const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
-  const head = ['Booking ID', 'Code', 'Guest', 'Phone', 'Check-in', 'Check-out', 'Duration (h)', 'Source', 'Amount', 'Payment', 'Status'];
-  const body = rows.map((b) => ['#' + b.id, b.code, b.guest, b.phone, b.checkIn.replace('T', ' '), b.checkOut?.replace('T', ' ') ?? '', b.durationHours, b.source, b.amount, b.payment, b.status].map(esc).join(','));
+  const head = ['Reference', 'Guest', 'Phone', 'Check-in', 'Stay', 'Amount', 'Payment', 'Status'];
+  const body = rows.map((b) => [b.reference, b.guest, b.phone, b.checkIn ? `${dayKey(b.checkIn)} ${fmtTime(b.checkIn)}` : '', b.stayLabel, b.amount, b.paymentStatus, b.status].map(esc).join(','));
   return [head.map(esc).join(','), ...body].join('\n');
 }
 
 export default function Bookings() {
-  const [params] = useSearchParams();
-  const [bookings, setBookings] = useState<Booking[]>(() => (params.get('demo') ? [...demoBookings(), ...BOOKINGS] : BOOKINGS));
-  const [autoAccept, setAutoAccept] = useState(false);
+  const { can } = useAuth();
+  const { data, error, loading, reload } = useApi(getBookings);
   const [tab, setTab] = useState<Tab>('All');
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [draft, setDraft] = useState<Filters>(NO_FILTERS);
   const [sheet, setSheet] = useState(false);
+  const [checkIn, setCheckIn] = useState<Booking | null>(null);
 
-  // tick once a second only while a request timer is running
-  const hasTimer = bookings.some((b) => b.status === 'Pending Approval' && b.requestExpiresAt);
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!hasTimer) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [hasTimer]);
+  const all = useMemo(() => [...(data ?? [])].sort((a, b) => (b.checkIn?.getTime() ?? 0) - (a.checkIn?.getTime() ?? 0)), [data]);
+  const count = (s: BookingStatus) => all.filter((b) => b.status === s).length;
+  const tabs: Tab[] = [...TABS, ...EXTRA_TABS.filter((s) => count(s) > 0)];
+  const activeFilters = (Object.keys(NO_FILTERS) as (keyof Filters)[]).filter((k) => filters[k] !== NO_FILTERS[k]).length;
+  const stayOptions = useMemo(() => [...new Set(all.map((b) => b.stayLabel))].filter((s) => s !== '—'), [all]);
+  const payOptions = useMemo(() => [...new Set(all.map((b) => b.paymentStatus).filter(Boolean))], [all]);
 
   useEffect(() => {
     if (!sheet) return;
@@ -64,50 +50,31 @@ export default function Bookings() {
     return () => window.removeEventListener('keydown', onKey);
   }, [sheet]);
 
-  const today = new Date();
-  const todayKey = dayKey(today);
-  const todayLabel = today.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  const count = (s: BookingStatus) => bookings.filter((b) => b.status === s).length;
-  const activeFilters = (Object.keys(NO_FILTERS) as (keyof Filters)[]).filter((k) => filters[k] !== NO_FILTERS[k]).length;
-
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase().replace(/^#/, '');
     const digits = q.replace(/\D/g, '');
-    return bookings.filter((b) => {
-      const day = b.checkIn.slice(0, 10);
+    return all.filter((b) => {
+      const day = b.checkIn ? dayKey(b.checkIn) : '';
       if (tab !== 'All' && b.status !== tab) return false;
-      if (filters.status !== 'all' && b.status !== filters.status) return false;
       if (filters.from && day < filters.from) return false;
       if (filters.to && day > filters.to) return false;
-      if (filters.duration !== 'all' && String(b.durationHours) !== filters.duration) return false;
-      if (filters.payment !== 'all' && b.payment !== filters.payment) return false;
-      if (q && !(b.id.includes(q) || b.code.toLowerCase().includes(q) || b.guest.toLowerCase().includes(q) || (digits && b.phone.includes(digits)))) return false;
+      if (filters.stay !== 'all' && b.stayLabel !== filters.stay) return false;
+      if (filters.payment !== 'all' && b.paymentStatus !== filters.payment) return false;
+      if (q && !(b.reference.toLowerCase().includes(q) || b.id.toLowerCase().includes(q) || b.guest.toLowerCase().includes(q) || (digits && b.phone.includes(digits)))) return false;
       return true;
     });
-  }, [bookings, tab, query, filters]);
-
-  const setStatusOf = (id: string, status: BookingStatus) =>
-    setBookings((all) => all.map((b) => (b.id === id ? { ...b, status, requestExpiresAt: null } : b)));
+  }, [all, tab, query, filters]);
 
   function exportCsv() {
     const url = URL.createObjectURL(new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a');
-    a.href = url; a.download = `bookings-${todayKey}.csv`; a.click();
+    a.href = url; a.download = `bookings-${dayKey(new Date())}.csv`; a.click();
     URL.revokeObjectURL(url);
   }
 
-  const stats = [
-    { label: 'Total', value: bookings.length, sub: 'This period', icon: <CalendarIcon /> },
-    { label: 'Pending', value: count('Pending Approval'), sub: 'Needs your action', icon: <ClockIcon />, accent: true },
-    { label: 'Check-ins', value: bookings.filter((b) => b.checkIn.slice(0, 10) === todayKey && b.status !== 'Cancelled').length, sub: todayLabel, icon: <CheckInIcon /> },
-    { label: 'Check-outs', value: bookings.filter((b) => b.checkOut?.slice(0, 10) === todayKey && b.status !== 'Cancelled').length, sub: todayLabel, icon: <CheckOutIcon /> },
-    { label: 'Active guests', value: count('Checked In'), sub: 'In-house now', icon: <UsersIcon /> },
-    { label: 'Cancelled', value: count('Cancelled'), sub: 'This period', icon: <XCircleIcon /> },
-  ];
-
-  const openSheet = () => { setDraft(filters); setSheet(true); };
   const apply = () => { setFilters(draft); setSheet(false); };
   const reset = () => { setDraft(NO_FILTERS); setFilters(NO_FILTERS); setSheet(false); };
+  const canCheckIn = can('checkin') || can('bookings');
 
   return (
     <div className="app">
@@ -115,52 +82,27 @@ export default function Bookings() {
         <header className="bk__bar">
           <div>
             <h1>Bookings</h1>
-            <p>Approve requests, check guests in and out</p>
+            <p>{loading && !data ? 'Loading…' : `${all.length} ${all.length === 1 ? 'booking' : 'bookings'} in total`}</p>
           </div>
-          <button type="button" className="icon-btn" onClick={exportCsv} aria-label="Export CSV">
-            <DownloadIcon />
-          </button>
+          <button type="button" className="icon-btn" onClick={exportCsv} aria-label="Export CSV" disabled={!rows.length}><DownloadIcon /></button>
         </header>
 
-        <section className="stats" aria-label="Summary">
-          {stats.map((s) => (
-            <div key={s.label} className={`stat${s.accent ? ' stat--accent' : ''}`}>
-              <div className="stat__label">{s.icon}{s.label}</div>
-              <div className="stat__value">{s.value}</div>
-              <div className="stat__sub">{s.sub}</div>
-            </div>
-          ))}
-        </section>
-
-        <section className="approval">
-          <div>
-            <h2>{autoAccept ? 'Auto approval' : 'Manual approval'}</h2>
-            <p>{autoAccept ? 'New requests are confirmed automatically.' : 'Accept each request before its timer runs out.'}</p>
-          </div>
-          <label className="switch">
-            <input type="checkbox" role="switch" checked={autoAccept} onChange={(e) => setAutoAccept(e.target.checked)} aria-label="Auto-accept bookings" />
-            <span className="switch__track" aria-hidden="true"><span className="switch__thumb" /></span>
-          </label>
-        </section>
+        {error && <div className="alert" role="alert"><AlertIcon /> {error} <button type="button" className="link-btn" onClick={reload}>Retry</button></div>}
 
         <div className="search">
           <label className="search__box">
             <SearchIcon />
-            <input
-              type="search" placeholder="Booking ID, guest or phone" value={query}
-              onChange={(e) => setQuery(e.target.value)} aria-label="Search bookings"
-            />
+            <input type="search" placeholder="Reference, guest or phone" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search bookings" />
           </label>
-          <button type="button" className="icon-btn icon-btn--filter" onClick={openSheet} aria-label={`Filters${activeFilters ? `, ${activeFilters} active` : ''}`}>
-            <FilterIcon />
-            {activeFilters > 0 && <span className="badge">{activeFilters}</span>}
+          <button type="button" className="icon-btn icon-btn--filter" onClick={() => { setDraft(filters); setSheet(true); }} aria-label={`Filters${activeFilters ? `, ${activeFilters} active` : ''}`}>
+            <FilterIcon />{activeFilters > 0 && <span className="badge">{activeFilters}</span>}
           </button>
         </div>
 
         <nav className="chips" role="tablist" aria-label="Booking status">
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <button key={t} type="button" role="tab" aria-selected={tab === t} className={`chip${tab === t ? ' is-active' : ''}`} onClick={() => setTab(t)}>
-              {t}<span className="chip__count">{t === 'All' ? bookings.length : count(t)}</span>
+              {t}<span className="chip__count">{t === 'All' ? all.length : count(t)}</span>
             </button>
           ))}
         </nav>
@@ -168,54 +110,46 @@ export default function Bookings() {
         <p className="result-count"><b>{rows.length}</b> {rows.length === 1 ? 'booking matches' : 'bookings match'} the current filters</p>
 
         <ul className="cards">
-          {rows.length === 0 && (
+          {loading && !data && <li className="empty"><span className="spinner spinner--dark" aria-hidden="true" /><strong>Loading bookings…</strong></li>}
+          {data && rows.length === 0 && (
             <li className="empty">
               <SearchIcon size={28} />
-              <strong>No bookings found</strong>
-              <span>Try a different search or clear the filters.</span>
-              {(activeFilters > 0 || query || tab !== 'All') && (
+              <strong>{all.length === 0 ? 'No bookings yet' : 'No bookings found'}</strong>
+              <span>{all.length === 0 ? 'New bookings from guests will show up here.' : 'Try a different search or clear the filters.'}</span>
+              {all.length > 0 && (activeFilters > 0 || query || tab !== 'All') && (
                 <button type="button" className="abtn-clear" onClick={() => { setQuery(''); setTab('All'); setFilters(NO_FILTERS); }}>Clear all</button>
               )}
             </li>
           )}
           {rows.map((b) => {
-            const left = timeLeft(b, now);
+            const ext = b.extension;
+            const ready = b.status === 'Confirmed' || b.status === 'Upcoming';
             return (
               <li key={b.id} className="card-b">
                 <div className="card-b__top">
-                  <span className="avatar">{b.guest[0]?.toUpperCase()}</span>
-                  <div className="card-b__who">
-                    <strong>{b.guest}</strong>
-                    <small>#{b.id} · {b.code}</small>
-                  </div>
+                  <span className="avatar">{initials(b.guest)}</span>
+                  <div className="card-b__who"><strong>{b.guest}</strong><small>#{b.reference}</small></div>
                   <span className={pillClass(b.status)}>{b.status}</span>
                 </div>
 
                 <dl className="card-b__grid">
-                  <div><dt>Check-in</dt><dd>{fmtTime(b.checkIn)}</dd><small>{fmtDate(b.checkIn)}</small></div>
-                  <div><dt>Duration</dt><dd>{b.durationHours} Hours</dd><small>{b.checkOut ? `Out ${fmtTime(b.checkOut)}` : 'Check-out —'}</small></div>
-                  <div><dt>Amount</dt><dd>{inr(b.amount)}</dd><small className={`pay pay--${b.payment}`}>{b.payment}</small></div>
+                  <div><dt>Check-in</dt><dd>{b.checkIn ? fmtTime(b.checkIn) : '—'}</dd><small>{b.checkIn ? fmtDate(b.checkIn) : ''}</small></div>
+                  <div><dt>Stay</dt><dd>{b.stayLabel}</dd><small>{b.checkOut ? `Out ${fmtTime(b.checkOut)}` : `${b.guests} ${b.guests === 1 ? 'guest' : 'guests'}`}</small></div>
+                  <div><dt>Amount</dt><dd>{inr(b.amount)}</dd><small className={`pay pay--${b.paymentStatus.toLowerCase()}`}>{b.paymentStatus || '—'}</small></div>
                 </dl>
 
                 <div className="card-b__meta">
-                  <span>{b.source}</span>
-                  <span>Extension: <b>{b.extension}</b></span>
-                  <a href={`tel:${b.phone}`} className="call" aria-label={`Call ${b.guest}`}><PhoneIcon size={16} />{b.phone}</a>
+                  {b.platformFee > 0 && <span>Platform fee <b>{inr(b.platformFee)}</b></span>}
+                  {b.tax > 0 && <span>GST <b>{inr(b.tax)}</b></span>}
+                  {b.phone && <a href={`tel:${b.phone}`} className="call" aria-label={`Call ${b.guest}`}><PhoneIcon size={16} />{b.phone}</a>}
                 </div>
 
-                {left && <div className="timer-bar"><ClockIcon size={16} /> Respond within <b>{left}</b></div>}
+                {ext && (
+                  <div className="timer-bar"><ClockIcon size={16} /> Extension {ext.status.toLowerCase()}: +{ext.extraHours}h · {inr(ext.amount)}</div>
+                )}
 
-                {b.status === 'Pending Approval' && (
-                  <div className="actions">
-                    <button type="button" className="abtn abtn--ghost" onClick={() => setStatusOf(b.id, 'Cancelled')}>Decline</button>
-                    <button type="button" className="abtn abtn--lime" onClick={() => setStatusOf(b.id, 'Confirmed')}>Accept</button>
-                  </div>
-                )}
-                {b.status === 'Confirmed' && (
-                  <div className="actions"><button type="button" className="abtn abtn--dark" onClick={() => setStatusOf(b.id, 'Checked In')}>Check in guest</button></div>
-                )}
-                {b.status === 'Checked In' && (
-                  <div className="actions"><button type="button" className="abtn abtn--dark" onClick={() => setStatusOf(b.id, 'Checked Out')}>Check out guest</button></div>
+                {ready && canCheckIn && (
+                  <div className="actions"><button type="button" className="abtn abtn--dark" onClick={() => setCheckIn(b)}>Check in guest</button></div>
                 )}
               </li>
             );
@@ -225,16 +159,16 @@ export default function Bookings() {
 
       <BottomNav />
 
+      {checkIn && <CheckInSheet booking={checkIn} onClose={() => setCheckIn(null)} onDone={() => { setCheckIn(null); reload(); }} />}
+
       {sheet && (
         <div className="sheet-wrap">
           <button type="button" className="sheet-scrim" aria-label="Close filters" onClick={() => setSheet(false)} />
           <div className="sheet" role="dialog" aria-modal="true" aria-label="Filters">
             <div className="sheet__grab" aria-hidden="true" />
-            <header className="sheet__head">
-              <h2>Filters</h2>
+            <header className="sheet__head"><h2>Filters</h2>
               <button type="button" className="icon-btn icon-btn--sm" onClick={() => setSheet(false)} aria-label="Close"><CloseIcon /></button>
             </header>
-
             <div className="sheet__body">
               <fieldset>
                 <legend>Check-in date</legend>
@@ -243,35 +177,19 @@ export default function Bookings() {
                   <label>To<input type="date" value={draft.to} min={draft.from || undefined} onChange={(e) => setDraft({ ...draft, to: e.target.value })} /></label>
                 </div>
               </fieldset>
-
               <fieldset>
-                <legend>Duration</legend>
+                <legend>Stay length</legend>
                 <div className="opts">
-                  {[['all', 'All'], ['3', '3 Hours'], ['6', '6 Hours'], ['9', '9 Hours'], ['12', '12 Hours']].map(([v, l]) => (
-                    <button key={v} type="button" aria-pressed={draft.duration === v} className={`opt${draft.duration === v ? ' is-on' : ''}`} onClick={() => setDraft({ ...draft, duration: v })}>{l}</button>
-                  ))}
+                  {['all', ...stayOptions].map((v) => <button key={v} type="button" aria-pressed={draft.stay === v} className={`opt${draft.stay === v ? ' is-on' : ''}`} onClick={() => setDraft({ ...draft, stay: v })}>{v === 'all' ? 'All' : v}</button>)}
                 </div>
               </fieldset>
-
               <fieldset>
                 <legend>Payment status</legend>
                 <div className="opts">
-                  {[['all', 'All'], ['paid', 'Paid'], ['pending', 'Pending'], ['refunded', 'Refunded'], ['failed', 'Failed']].map(([v, l]) => (
-                    <button key={v} type="button" aria-pressed={draft.payment === v} className={`opt${draft.payment === v ? ' is-on' : ''}`} onClick={() => setDraft({ ...draft, payment: v })}>{l}</button>
-                  ))}
-                </div>
-              </fieldset>
-
-              <fieldset>
-                <legend>Booking status</legend>
-                <div className="opts">
-                  {['all', ...STATUSES].map((v) => (
-                    <button key={v} type="button" aria-pressed={draft.status === v} className={`opt${draft.status === v ? ' is-on' : ''}`} onClick={() => setDraft({ ...draft, status: v })}>{v === 'all' ? 'All' : v}</button>
-                  ))}
+                  {['all', ...payOptions].map((v) => <button key={v} type="button" aria-pressed={draft.payment === v} className={`opt${draft.payment === v ? ' is-on' : ''}`} onClick={() => setDraft({ ...draft, payment: v })}>{v === 'all' ? 'All' : v}</button>)}
                 </div>
               </fieldset>
             </div>
-
             <footer className="sheet__foot">
               <button type="button" className="abtn abtn--ghost" onClick={reset}>Reset</button>
               <button type="button" className="abtn abtn--lime" onClick={apply}>Show results</button>

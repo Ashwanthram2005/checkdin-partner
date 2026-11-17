@@ -214,3 +214,23 @@ button.link-lime { background: none; border: 0; cursor: pointer; font: inherit; 
 .card .demo-note { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 12px; background: rgba(220,247,58,.12); border: 1px solid rgba(220,247,58,.35); color: var(--on-dark-muted); font-size: 13px; line-height: 1.4; }
 .demo-note svg { flex: none; margin-top: 1px; color: var(--lime); }
 .demo-note b { color: #fff; }
+
+/* account list (login step 2) */
+.accounts { display: flex; flex-direction: column; gap: 10px; }
+.account { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: #1f1f1f; border: 2px solid #2e2e2e; border-radius: 16px; padding: 12px; color: #fff; font: inherit; cursor: pointer; }
+.account:hover, .account:focus-visible { border-color: var(--lime); }
+.account:active { transform: scale(.99); }
+.account__avatar { width: 42px; height: 42px; flex: none; border-radius: 50%; background: var(--lime); color: var(--ink); display: grid; place-items: center; font-weight: 800; font-size: 14px; }
+.account__info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.account__info strong { font-size: 16px; font-weight: 700; }
+.account__info small { color: #9a9a93; font-size: 13px; }
+.account > svg { color: #8a8a84; flex: none; }
+.hotel-chip { display: flex; align-items: center; gap: 12px; background: #1f1f1f; border-radius: 16px; padding: 10px 14px; }
+.hotel-chip__text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.hotel-chip__text strong { font-size: 15px; }
+.hotel-chip__text small { color: #9a9a93; font-size: 13px; }
+.steps { display: flex; justify-content: center; gap: 6px; margin: 0 0 14px; }
+.steps__dot { width: 28px; height: 6px; border-radius: 3px; background: #dedede; }
+.steps__dot.is-on { background: var(--ink); }
+.card .slow { margin: 0; text-align: center; color: var(--lime); font-size: 13px; line-height: 1.4; }
+button.back { border: 0; cursor: pointer; }

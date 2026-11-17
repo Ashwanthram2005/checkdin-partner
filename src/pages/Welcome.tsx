@@ -23,14 +23,14 @@ export default function Welcome() {
         </Link>
       </section>
 
-      <Link to="/register" className="card card--outline" aria-labelledby="new-partner">
+      <a href="https://checkdin-onboard.web.app" target="_blank" rel="noreferrer" className="card card--outline" aria-labelledby="new-partner">
         <div className="card__body">
           <div className="card__icon"><BuildingIcon /></div>
           <h2 id="new-partner">Not Listed on Checkdin?</h2>
           <p>Join Checkdin and start receiving short-stay bookings from travellers looking for 3, 6 and 12-hour stays.</p>
         </div>
         <span className="card__chevron"><ChevronRight /></span>
-      </Link>
+      </a>
 
       <footer className="welcome__help">
         Need help? Call partner support on{' '}

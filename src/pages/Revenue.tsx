@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import BottomNav from '../components/BottomNav';
-import { ArrowUpIcon, BankIcon, ChartBarIcon, ChevronDown, InfoIcon, TableIcon } from '../components/Icons';
-import { PLATFORM_FEE_TOTAL } from '../data/pricing';
-import { BANK, addDays, payouts, range, sum, type DayStat, type Payout } from '../data/revenue';
+import { AlertIcon, ArrowUpIcon, BankIcon, ChartBarIcon, InfoIcon, TableIcon } from '../components/Icons';
+import { getBookings, getPayouts, getPropertySettings, type Booking } from '../api/partner';
+import { useApi } from '../api/useApi';
+import { useAuth } from '../auth/AuthContext';
+import { addDays, dayKey, fmtDate, fmtDayMonth, inr } from '../lib/format';
 import '../styles/bookings.css';
 import '../styles/revenue.css';
 
@@ -13,58 +15,69 @@ const PERIODS: { id: Period; label: string }[] = [
   { id: 'month', label: 'This month' },
 ];
 
-const inr = (n: number) => '₹' + Math.round(n).toLocaleString('en-IN');
-const fmtDay = (key: string, o: Intl.DateTimeFormatOptions) => new Date(key + 'T00:00').toLocaleDateString('en-GB', o);
-const fmtDate = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+/** Stays that have actually happened count as earnings. */
+const EARNED = new Set(['Checked in', 'Completed']);
 
-/** Smallest "clean" ceiling whose quarter steps are round numbers. */
+interface Day { date: string; label: string; bookings: number; base: number; fee: number; tax: number; paid: number; net: number }
+
+function dayStats(bookings: Booking[], from: Date, to: Date): Day[] {
+  const days: Day[] = [];
+  for (let d = from; d <= to; d = addDays(d, 1)) days.push({ date: dayKey(d), label: '', bookings: 0, base: 0, fee: 0, tax: 0, paid: 0, net: 0 });
+  const idx = new Map(days.map((d, i) => [d.date, i]));
+  for (const b of bookings) {
+    if (!b.checkIn || !EARNED.has(b.status)) continue;
+    const i = idx.get(dayKey(b.checkIn));
+    if (i === undefined) continue;
+    const d = days[i];
+    d.bookings += 1; d.base += b.base; d.fee += b.platformFee; d.tax += b.tax; d.paid += b.amount;
+    d.net += b.base - b.platformFee;
+  }
+  return days;
+}
+const sum = (days: Day[]) => days.reduce((t, d) => ({ bookings: t.bookings + d.bookings, base: t.base + d.base, fee: t.fee + d.fee, tax: t.tax + d.tax, paid: t.paid + d.paid, net: t.net + d.net }), { bookings: 0, base: 0, fee: 0, tax: 0, paid: 0, net: 0 });
+
 function niceMax(v: number) {
   if (v <= 0) return 1000;
   const p = 10 ** Math.floor(Math.log10(v));
-  const n = v / p;
-  const m = [1, 1.2, 1.6, 2, 3, 4, 6, 8, 10].find((x) => x >= n) ?? 10;
-  return m * p;
+  return ([1, 1.2, 1.6, 2, 3, 4, 6, 8, 10].find((x) => x >= v / p) ?? 10) * p;
 }
-const tickLabel = (v: number, compact: boolean) =>
-  compact && v >= 1000 ? `${+(v / 1000).toFixed(1)}K` : v.toLocaleString('en-IN');
+const tickLabel = (v: number, compact: boolean) => (compact && v >= 1000 ? `${+(v / 1000).toFixed(1)}K` : v.toLocaleString('en-IN'));
 
 export default function Revenue() {
+  const { session } = useAuth();
+  const books = useApi(getBookings);
+  const payouts = useApi(getPayouts);
+  const settings = useApi(() => getPropertySettings(session?.hotelId ?? ''), [session?.hotelId]);
   const [period, setPeriod] = useState<Period>('7');
-  const [active, setActive] = useState(-1); // index into days; -1 = latest
+  const [active, setActive] = useState(-1);
   const [asTable, setAsTable] = useState(false);
 
   const today = useMemo(() => new Date(), []);
   const { days, prevNet, count } = useMemo(() => {
     const n = period === '7' ? 7 : period === '30' ? 30 : today.getDate();
     const from = addDays(today, -(n - 1));
-    return {
-      days: range(from, today),
-      prevNet: sum(range(addDays(from, -n), addDays(from, -1))).net,
-      count: n,
-    };
-  }, [period, today]);
-
-  useEffect(() => setActive(-1), [period]);
+    const all = books.data ?? [];
+    return { days: dayStats(all, from, today), prevNet: sum(dayStats(all, addDays(from, -n), addDays(from, -1))).net, count: n };
+  }, [books.data, period, today]);
 
   const totals = useMemo(() => sum(days), [days]);
-  const idx = active < 0 ? days.length - 1 : active;
+  const idx = active < 0 ? days.length - 1 : Math.min(active, days.length - 1);
   const sel = days[idx];
   const delta = prevNet > 0 ? Math.round(((totals.net - prevNet) / prevNet) * 100) : null;
-
   const yMax = niceMax(Math.max(...days.map((d) => d.net)));
   const ticks = [0, 1, 2, 3, 4].map((i) => (yMax / 4) * i);
-  const compact = yMax >= 10000;
+
+  const upcoming = (books.data ?? []).filter((b) => (b.status === 'Confirmed' || b.status === 'Upcoming') && b.checkIn && b.checkIn >= new Date(today.getFullYear(), today.getMonth(), today.getDate()));
+  const upcomingNet = upcoming.reduce((t, b) => t + b.base - b.platformFee, 0);
 
   const shares = [
-    { key: 'net', name: 'You keep', note: 'Net earnings', value: totals.net, strong: true },
-    { key: 'gst', name: 'GST collected', note: 'Passed on to the government', value: totals.gst, strong: false },
-    { key: 'fee', name: 'Platform fee', note: `${inr(PLATFORM_FEE_TOTAL)} × ${totals.bookings} bookings`, value: totals.fee, strong: false },
+    { key: 'net', name: 'You keep', note: 'Slot price minus platform fee', value: totals.net, strong: true },
+    { key: 'gst', name: 'GST collected', note: 'Passed on to the government', value: totals.tax, strong: false },
+    { key: 'fee', name: 'Platform fee', note: `${totals.bookings} ${totals.bookings === 1 ? 'booking' : 'bookings'}`, value: totals.fee, strong: false },
   ].sort((a, b) => b.value - a.value);
 
-  const plist = useMemo(() => payouts(today), [today]);
-  const upcoming = [...plist].reverse().find((p) => p.status !== 'Paid');
-  const weekStart = addDays(today, -((today.getDay() + 6) % 7));
-  const accruing = useMemo(() => sum(range(weekStart, today)), [weekStart, today]);
+  const bank = settings.data?.banking;
+  const bankReady = !!bank && bank.status.toLowerCase() !== 'pending' && !!bank.accountLast4;
 
   function onKey(e: React.KeyboardEvent) {
     const move = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : e.key === 'Home' ? -999 : e.key === 'End' ? 999 : 0;
@@ -74,75 +87,51 @@ export default function Revenue() {
     setActive(next);
     (e.currentTarget.querySelectorAll('button')[next] as HTMLElement | undefined)?.focus();
   }
+  const empty = !!books.data && totals.bookings === 0;
 
   return (
     <div className="app">
       <main className="bk rv">
-        <header className="bk__bar">
-          <div>
-            <h1>Revenue</h1>
-            <p>Earnings after the platform fee</p>
-          </div>
-        </header>
+        <header className="bk__bar"><div><h1>Revenue</h1><p>Earnings after the platform fee</p></div></header>
+
+        {(books.error || payouts.error) && <div className="alert" role="alert"><AlertIcon /> {books.error ?? payouts.error} <button type="button" className="link-btn" onClick={() => { books.reload(); payouts.reload(); }}>Retry</button></div>}
 
         <nav className="chips" role="tablist" aria-label="Period">
-          {PERIODS.map((p) => (
-            <button key={p.id} type="button" role="tab" aria-selected={period === p.id} className={`chip${period === p.id ? ' is-active' : ''}`} onClick={() => setPeriod(p.id)}>
-              {p.label}
-            </button>
-          ))}
+          {PERIODS.map((p) => <button key={p.id} type="button" role="tab" aria-selected={period === p.id} className={`chip${period === p.id ? ' is-active' : ''}`} onClick={() => { setPeriod(p.id); setActive(-1); }}>{p.label}</button>)}
         </nav>
 
         <section className="hero" aria-label="Net earnings">
           <p className="hero__label">Net earnings</p>
-          <p className="hero__value">{inr(totals.net)}</p>
+          <p className="hero__value">{books.loading && !books.data ? '…' : inr(totals.net)}</p>
           <p className="hero__meta">
-            {delta !== null && (
-              <span className={`delta delta--${delta >= 0 ? 'up' : 'down'}`}>
-                <ArrowUpIcon size={14} />{delta >= 0 ? 'Up' : 'Down'} {Math.abs(delta)}%
-              </span>
-            )}
-            <span>vs previous {count} days</span>
+            {delta !== null && <span className={`delta delta--${delta >= 0 ? 'up' : 'down'}`}><ArrowUpIcon size={14} />{delta >= 0 ? 'Up' : 'Down'} {Math.abs(delta)}%</span>}
+            <span>{delta !== null ? `vs previous ${count} days` : 'From stays that checked in or finished'}</span>
           </p>
-          <p className="hero__sub">{totals.bookings} bookings · {fmtDate(days[0] ? new Date(days[0].date + 'T00:00') : today)} – {fmtDate(today)}</p>
+          <p className="hero__sub">{totals.bookings} {totals.bookings === 1 ? 'stay' : 'stays'} · {fmtDayMonth(new Date(days[0].date + 'T00:00'))} – {fmtDayMonth(today)}{upcoming.length > 0 ? ` · ${inr(upcomingNet)} more booked ahead` : ''}</p>
         </section>
 
         <section className="panel" aria-label="Daily earnings">
           <div className="panel__head">
-            <div>
-              <h2>Daily earnings</h2>
-              <p>Net of the platform fee</p>
-            </div>
-            <button type="button" className="mini-btn" onClick={() => setAsTable((v) => !v)} aria-pressed={asTable}>
-              {asTable ? <ChartBarIcon /> : <TableIcon />}{asTable ? 'Chart' : 'Table'}
-            </button>
+            <div><h2>Daily earnings</h2><p>Net of the platform fee</p></div>
+            <button type="button" className="mini-btn" onClick={() => setAsTable((v) => !v)} aria-pressed={asTable}>{asTable ? <ChartBarIcon /> : <TableIcon />}{asTable ? 'Chart' : 'Table'}</button>
           </div>
 
-          {!asTable ? (
+          {empty ? <p className="muted-note">No earnings in this period yet. Stays that check in or finish will appear here.</p> : !asTable ? (
             <>
               <div className="readout" aria-live="polite">
                 <strong>{inr(sel.net)}</strong>
-                <span>{fmtDay(sel.date, { weekday: 'short', day: 'numeric', month: 'short' })} · {sel.bookings} bookings</span>
+                <span>{fmtDate(new Date(sel.date + 'T00:00'))} · {sel.bookings} {sel.bookings === 1 ? 'stay' : 'stays'}</span>
               </div>
-
               <div className="plot">
-                <div className="plot__y" aria-hidden="true">
-                  {ticks.map((t) => <span key={t} style={{ bottom: `${(t / yMax) * 100}%` }}>{tickLabel(t, compact)}</span>)}
-                </div>
+                <div className="plot__y" aria-hidden="true">{ticks.map((t) => <span key={t} style={{ bottom: `${(t / yMax) * 100}%` }}>{tickLabel(t, yMax >= 10000)}</span>)}</div>
                 <div className="plot__area">
                   {ticks.map((t) => <i key={t} className="plot__grid" style={{ bottom: `${(t / yMax) * 100}%` }} aria-hidden="true" />)}
                   <div className="plot__bars" role="group" aria-label="Net earnings per day. Use the left and right arrow keys to move between days." onKeyDown={onKey}>
-                    {days.map((d: DayStat, i) => (
-                      <button
-                        key={d.date} type="button" className={`col${i === idx ? ' is-active' : ''}`}
-                        tabIndex={i === idx ? 0 : -1}
-                        aria-label={`${fmtDay(d.date, { weekday: 'long', day: 'numeric', month: 'long' })}: ${inr(d.net)} from ${d.bookings} bookings`}
-                        aria-pressed={i === idx}
-                        onPointerEnter={(e) => e.pointerType === 'mouse' && setActive(i)}
-                        onClick={() => setActive(i)}
-                        onFocus={() => setActive(i)}
-                      >
-                        <span className="bar" style={{ height: `${Math.max(1.5, (d.net / yMax) * 100)}%` }} />
+                    {days.map((d, i) => (
+                      <button key={d.date} type="button" className={`col${i === idx ? ' is-active' : ''}`} tabIndex={i === idx ? 0 : -1}
+                        aria-label={`${new Date(d.date + 'T00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}: ${inr(d.net)} from ${d.bookings} stays`}
+                        aria-pressed={i === idx} onPointerEnter={(e) => e.pointerType === 'mouse' && setActive(i)} onClick={() => setActive(i)} onFocus={() => setActive(i)}>
+                        <span className="bar" style={{ height: `${Math.max(d.net > 0 ? 1.5 : 0, (d.net / yMax) * 100)}%` }} />
                       </button>
                     ))}
                   </div>
@@ -151,92 +140,70 @@ export default function Revenue() {
               <div className="plot__x" aria-hidden="true">
                 {days.map((d, i) => {
                   const show = days.length <= 7 ? true : (days.length - 1 - i) % 5 === 0;
-                  return <span key={d.date}>{show ? (days.length <= 7 ? fmtDay(d.date, { weekday: 'short' }) : fmtDay(d.date, { day: 'numeric' })) : ''}</span>;
+                  const dt = new Date(d.date + 'T00:00');
+                  return <span key={d.date}>{show ? (days.length <= 7 ? dt.toLocaleDateString('en-GB', { weekday: 'short' }) : dt.getDate()) : ''}</span>;
                 })}
               </div>
             </>
           ) : (
             <div className="tbl-wrap">
               <table className="tbl">
-                <thead><tr><th>Date</th><th className="r">Bookings</th><th className="r">Net earnings</th></tr></thead>
-                <tbody>
-                  {[...days].reverse().map((d) => (
-                    <tr key={d.date}><td>{fmtDay(d.date, { weekday: 'short', day: 'numeric', month: 'short' })}</td><td className="r">{d.bookings}</td><td className="r">{inr(d.net)}</td></tr>
-                  ))}
-                </tbody>
+                <thead><tr><th>Date</th><th className="r">Stays</th><th className="r">Net</th></tr></thead>
+                <tbody>{[...days].reverse().map((d) => <tr key={d.date}><td>{fmtDate(new Date(d.date + 'T00:00'))}</td><td className="r">{d.bookings}</td><td className="r">{inr(d.net)}</td></tr>)}</tbody>
                 <tfoot><tr><td>Total</td><td className="r">{totals.bookings}</td><td className="r">{inr(totals.net)}</td></tr></tfoot>
               </table>
             </div>
           )}
         </section>
 
-        <section className="panel" aria-label="Where guest payments go">
-          <div className="panel__head">
-            <div>
-              <h2>Where guest payments go</h2>
-              <p>Guests paid {inr(totals.guestPaid)} in total</p>
-            </div>
-          </div>
-          <ul className="shares">
-            {shares.map((s) => (
-              <li key={s.key}>
-                <div className="share__row">
-                  <span className="share__name"><strong>{s.name}</strong><small>{s.note}</small></span>
-                  <span className="share__amt"><strong>{inr(s.value)}</strong><small>{Math.round((s.value / totals.guestPaid) * 100)}%</small></span>
-                </div>
-                <div className="meter" role="img" aria-label={`${s.name}: ${Math.round((s.value / totals.guestPaid) * 100)}% of guest payments`}>
-                  <span className={`meter__fill${s.strong ? ' is-strong' : ''}`} style={{ width: `${(s.value / totals.guestPaid) * 100}%` }} />
-                </div>
-              </li>
-            ))}
-          </ul>
-          <p className="note"><InfoIcon /> No commission. Checkdin charges ₹79 + 18% GST per booking.</p>
-        </section>
+        {!empty && totals.paid > 0 && (
+          <section className="panel" aria-label="Where guest payments go">
+            <div className="panel__head"><div><h2>Where guest payments go</h2><p>Guests paid {inr(totals.paid)} in total</p></div></div>
+            <ul className="shares">
+              {shares.map((s) => (
+                <li key={s.key}>
+                  <div className="share__row">
+                    <span className="share__name"><strong>{s.name}</strong><small>{s.note}</small></span>
+                    <span className="share__amt"><strong>{inr(s.value)}</strong><small>{Math.round((s.value / totals.paid) * 100)}%</small></span>
+                  </div>
+                  <div className="meter" role="img" aria-label={`${s.name}: ${Math.round((s.value / totals.paid) * 100)}% of guest payments`}>
+                    <span className={`meter__fill${s.strong ? ' is-strong' : ''}`} style={{ width: `${Math.min(100, (s.value / totals.paid) * 100)}%` }} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <p className="note"><InfoIcon /> Estimates from your bookings. Final amounts are confirmed when a payout is settled.</p>
+          </section>
+        )}
 
         <h2 className="section-title">Payouts</h2>
 
-        <section className="payout-next" aria-label="Next payout">
+        <section className="payout-next" aria-label="Bank account">
           <div className="payout-next__top">
             <span className="bank-ico"><BankIcon /></span>
             <div>
-              <p className="payout-next__label">Next payout</p>
-              <p className="payout-next__date">{upcoming ? upcoming.payoutDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) : '—'}</p>
+              <p className="payout-next__label">Payout account</p>
+              <p className="payout-next__date">{settings.loading && !settings.data ? 'Checking…' : bankReady ? `${bank!.bankName} ••${bank!.accountLast4}` : 'Bank account not verified yet'}</p>
             </div>
           </div>
-          <p className="payout-next__amt">{upcoming ? inr(upcoming.totals.net) : '₹0'}</p>
           <p className="payout-next__sub">
-            {upcoming ? `For ${fmtDate(upcoming.from)} – ${fmtDate(upcoming.to)} · ${upcoming.totals.bookings} bookings` : 'Nothing scheduled'}
+            {bankReady ? `Status: ${bank!.status}` : 'Add and verify your bank details on the partner portal (partner.checkdin.in → Settings) so payouts can reach you.'}
           </p>
-          <div className="payout-next__foot">
-            <span>To {BANK.name} ••{BANK.last4}</span>
-            <span>This week so far: <b>{inr(accruing.net)}</b></span>
-          </div>
+          {bank && <div className="payout-next__foot"><span>PAN: <b>{bank.panStatus || '—'}</b></span><span>GST: <b>{bank.gstStatus || '—'}</b></span></div>}
         </section>
 
+        {payouts.loading && !payouts.data && <p className="muted-note">Loading payouts…</p>}
+        {payouts.data && payouts.data.length === 0 && <p className="muted-note">No payouts yet. They appear here once your first stays are settled.</p>}
         <ul className="plist">
-          {plist.map((p: Payout) => (
+          {(payouts.data ?? []).map((p) => (
             <li key={p.id}>
-              <details>
-                <summary>
-                  <span className="plist__main">
-                    <strong>{fmtDate(p.from)} – {fmtDate(p.to)}</strong>
-                    <small>{p.status === 'Paid' ? 'Paid' : p.status === 'Processing' ? 'Processing today' : 'Pays'} {fmtDate(p.payoutDate)}</small>
-                  </span>
-                  <span className="plist__amt"><strong>{inr(p.totals.net)}</strong><span className={`pill pill--${p.status.toLowerCase()}`}>{p.status}</span></span>
-                  <ChevronDown size={18} />
-                </summary>
-                <dl className="plist__detail">
-                  <div><dt>Bookings</dt><dd>{p.totals.bookings}</dd></div>
-                  <div><dt>Slot revenue</dt><dd>{inr(p.totals.slotRevenue)}</dd></div>
-                  <div><dt>Platform fee</dt><dd>−{inr(p.totals.fee)}</dd></div>
-                  <div className="total"><dt>Net payout</dt><dd>{inr(p.totals.net)}</dd></div>
-                  {p.utr && <div><dt>Bank reference</dt><dd className="mono">{p.utr}</dd></div>}
-                </dl>
-              </details>
+              <div className="plist__row">
+                <span className="plist__main"><strong>{p.label}</strong><small>{p.date ? fmtDate(p.date) : ''}{p.reference ? ` · ${p.reference}` : ''}</small></span>
+                <span className="plist__amt"><strong>{inr(p.amount)}</strong>{p.status && <span className={`pill pill--${p.status.toLowerCase().replace(/\s+/g, '-')}`}>{p.status}</span>}</span>
+              </div>
             </li>
           ))}
         </ul>
-        <p className="note"><InfoIcon /> Earnings from Monday to Sunday are paid out the following Wednesday.</p>
       </main>
       <BottomNav />
     </div>
