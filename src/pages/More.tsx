@@ -5,7 +5,7 @@ import {
   BankIcon, BellIcon, CheckOutIcon, ChevronRightSm, FileTextIcon, HelpIcon, HotelIdIcon, PhoneIcon,
   ShieldIcon, UserIcon, UsersIcon, VolumeIcon,
 } from '../components/Icons';
-import { useSession } from '../auth/session';
+import { clearSession, useSession } from '../auth/session';
 import { can } from '../data/roles';
 import '../styles/bookings.css';
 import '../styles/more.css';
@@ -64,7 +64,7 @@ export default function More() {
   const toggle = (k: keyof Prefs) => setPrefs((p) => ({ ...p, [k]: !p[k] }));
 
   function logout() {
-    // TODO: clear the stored token and user, then return to the start.
+    clearSession(); // TODO (real login): also drop the stored token
     setConfirm(false);
     navigate('/');
   }

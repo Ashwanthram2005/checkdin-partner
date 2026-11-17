@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Brand from '../components/Brand';
+import { DEMO_MODE, DEMO_PASSWORD, saveSession } from '../auth/session';
 import {
   AlertIcon, ArrowLeft, ArrowRight, EyeIcon, EyeOffIcon, HotelIdIcon, LockIcon, MailIcon,
   ShieldIcon, UserIcon,
@@ -20,6 +21,7 @@ const METHODS: Record<Method, { tab: string; label: string; placeholder: string;
 const USER_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,29}$/;
 
 export default function Login() {
+  const navigate = useNavigate();
   const [method, setMethod] = useState<Method>('email');
   const [identifier, setIdentifier] = useState('');
   const [hotelName, setHotelName] = useState<string | null>(null);
@@ -88,8 +90,9 @@ export default function Login() {
 
     setLoading(true);
     try {
-      await loginAsUser(userId.trim(), password);
-      // TODO: store the token + user.role_id, then navigate('/dashboard').
+      const session = await loginAsUser(userId.trim(), password);
+      saveSession(session.user.id); // TODO (real login): also keep session.token
+      navigate('/bookings', { replace: true });
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Login failed. Please try again.');
     } finally {
@@ -176,6 +179,10 @@ export default function Login() {
           </div>
 
           {formError && <div className="alert" role="alert"><AlertIcon /> {formError}</div>}
+
+          {DEMO_MODE && (
+            <p className="demo-note"><ShieldIcon size={16} /><span>Demo mode: use User ID <b>pu1</b> and password <b>{DEMO_PASSWORD}</b>.</span></p>
+          )}
 
           <div className={`field${userError ? ' field--error' : ''}`}>
             <label htmlFor="userId">User ID</label>

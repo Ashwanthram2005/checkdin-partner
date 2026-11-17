@@ -210,3 +210,7 @@ button.back { border: 0; cursor: pointer; }
 .hotel-chip__text small { color: #9a9a9a; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 button.link-lime { background: none; border: 0; cursor: pointer; font: inherit; font-size: 14px; font-weight: 600; }
 
+
+.card .demo-note { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 12px; background: rgba(220,247,58,.12); border: 1px solid rgba(220,247,58,.35); color: var(--on-dark-muted); font-size: 13px; line-height: 1.4; }
+.demo-note svg { flex: none; margin-top: 1px; color: var(--lime); }
+.demo-note b { color: #fff; }
