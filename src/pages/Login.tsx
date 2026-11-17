@@ -3,61 +3,71 @@ import { Link } from 'react-router-dom';
 import Brand from '../components/Brand';
 import {
   AlertIcon, ArrowLeft, ArrowRight, EyeIcon, EyeOffIcon, HotelIdIcon, LockIcon, MailIcon,
-  PhoneIcon, ShieldIcon,
+  ShieldIcon,
 } from '../components/Icons';
 
 const SUPPORT_NUMBER = '1800 313 2200';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_RE = /^[6-9]\d{9}$/;
 const HOTEL_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{1,19}$/;
 
-type IdKind = 'email' | 'mobile' | 'hotel' | 'unknown';
-
-/** Works out whether the user typed an email, a mobile number or a Hotel ID. */
-function detectKind(raw: string): IdKind {
-  const v = raw.trim();
-  if (!v) return 'unknown';
-  if (v.includes('@')) return EMAIL_RE.test(v) ? 'email' : 'unknown';
-  const digits = v.replace(/[\s-]/g, '');
-  if (/^\d+$/.test(digits)) return PHONE_RE.test(digits) ? 'mobile' : 'unknown';
-  return HOTEL_ID_RE.test(v) ? 'hotel' : 'unknown';
-}
-
-const KIND_LABEL: Record<IdKind, string> = {
-  email: 'Email', mobile: 'Mobile number', hotel: 'Hotel ID', unknown: '',
-};
-
+type Method = 'email' | 'hotel';
 type Errors = { id?: string; password?: string; form?: string };
 
-function validate(id: string, password: string): Errors {
+const METHODS: Record<Method, { tab: string; label: string; placeholder: string; empty: string; invalid: string }> = {
+  email: {
+    tab: 'Email',
+    label: 'Email address',
+    placeholder: 'you@property.com',
+    empty: 'Enter your registered email',
+    invalid: 'Enter a valid email address',
+  },
+  hotel: {
+    tab: 'Hotel ID',
+    label: 'Hotel ID',
+    placeholder: 'e.g. h1',
+    empty: 'Enter your Hotel ID',
+    invalid: 'Hotel ID can have letters, numbers, - and _ only',
+  },
+};
+
+function validate(method: Method, id: string, password: string): Errors {
   const errors: Errors = {};
   const value = id.trim();
-  if (!value) errors.id = 'Enter your email, mobile number or Hotel ID';
-  else if (detectKind(value) === 'unknown')
-    errors.id = 'Enter a valid email, 10-digit mobile number or Hotel ID';
+  const m = METHODS[method];
+  if (!value) errors.id = m.empty;
+  else if (method === 'email' ? !EMAIL_RE.test(value) : !HOTEL_ID_RE.test(value)) errors.id = m.invalid;
   if (!password) errors.password = 'Enter your password';
   else if (password.length < 6) errors.password = 'Password must be at least 6 characters';
   return errors;
 }
 
 export default function Login() {
+  const [method, setMethod] = useState<Method>('email');
   const [id, setId] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
   const [remember, setRemember] = useState(true);
   const [errors, setErrors] = useState<Errors>({});
-  const kind = detectKind(id);
   const [loading, setLoading] = useState(false);
+  const m = METHODS[method];
+
+  function switchMethod(next: Method) {
+    if (next === method) return;
+    setMethod(next);
+    setId('');
+    setErrors({});
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    const next = validate(id, password);
+    const next = validate(method, id, password);
     setErrors(next);
     if (Object.keys(next).length) return;
 
     setLoading(true);
     try {
       // TODO: replace with the real partner auth API call.
+      // Send { email, password } when method === 'email', or { hotelId, password } when 'hotel'.
       await new Promise((r) => setTimeout(r, 900));
       setErrors({ form: 'Login is not connected to the server yet.' });
     } finally {
@@ -79,6 +89,22 @@ export default function Login() {
       </header>
 
       <form className="card card--dark login__card" onSubmit={onSubmit} noValidate>
+        <div className="segmented" role="tablist" aria-label="Login method">
+          {(Object.keys(METHODS) as Method[]).map((key) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={method === key}
+              className={`segmented__btn${method === key ? ' is-active' : ''}`}
+              onClick={() => switchMethod(key)}
+            >
+              {key === 'email' ? <MailIcon size={18} /> : <HotelIdIcon size={18} />}
+              {METHODS[key].tab}
+            </button>
+          ))}
+        </div>
+
         {errors.form && (
           <div className="alert" role="alert">
             <AlertIcon /> {errors.form}
@@ -86,28 +112,29 @@ export default function Login() {
         )}
 
         <div className={`field${errors.id ? ' field--error' : ''}`}>
-          <label htmlFor="id">Email, mobile or Hotel ID</label>
+          <label htmlFor="id">{m.label}</label>
           <div className="field__box">
-            {kind === 'hotel' ? <HotelIdIcon /> : kind === 'mobile' ? <PhoneIcon /> : <MailIcon />}
+            {method === 'email' ? <MailIcon /> : <HotelIdIcon />}
             <input
               id="id"
-              type="text"
+              key={method}
+              type={method === 'email' ? 'email' : 'text'}
+              inputMode={method === 'email' ? 'email' : 'text'}
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
-              autoComplete="username"
-              placeholder="you@property.com or Hotel ID"
+              autoComplete={method === 'email' ? 'email' : 'username'}
+              placeholder={m.placeholder}
               value={id}
-              onChange={(e) => { setId(e.target.value); setErrors((x) => ({ ...x, id: undefined, form: undefined })); }}
+              onChange={(e) => {
+                setId(e.target.value);
+                setErrors((x) => ({ ...x, id: undefined, form: undefined }));
+              }}
               aria-invalid={!!errors.id}
               aria-describedby={errors.id ? 'id-err' : undefined}
             />
           </div>
-          {errors.id ? (
-            <p className="field__error" id="id-err">{errors.id}</p>
-          ) : kind !== 'unknown' ? (
-            <p className="field__hint">Signing in with {KIND_LABEL[kind]}</p>
-          ) : null}
+          {errors.id && <p className="field__error" id="id-err">{errors.id}</p>}
         </div>
 
         <div className={`field${errors.password ? ' field--error' : ''}`}>
@@ -120,7 +147,10 @@ export default function Login() {
               autoComplete="current-password"
               placeholder="Enter your password"
               value={password}
-              onChange={(e) => { setPassword(e.target.value); setErrors((x) => ({ ...x, password: undefined, form: undefined })); }}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setErrors((x) => ({ ...x, password: undefined, form: undefined }));
+              }}
               aria-invalid={!!errors.password}
               aria-describedby={errors.password ? 'pw-err' : undefined}
             />

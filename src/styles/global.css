@@ -174,3 +174,19 @@ a:focus-visible, .btn:focus-visible, button:focus-visible { outline: 3px solid v
 .card--outline:focus-visible, .back:focus-visible { outline-color: var(--ink); }
 
 .card .field__hint { color: var(--lime); font-size: 13px; line-height: 1.35; margin: 8px 0 0; }
+
+/* Login method toggle */
+.segmented {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+  background: #1f1f1f; border-radius: 16px; padding: 4px;
+}
+.segmented__btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  height: 46px; border: 0; border-radius: 12px; cursor: pointer;
+  background: transparent; color: var(--on-dark-muted);
+  font: inherit; font-size: 15px; font-weight: 600;
+  transition: background .15s ease, color .15s ease;
+}
+.segmented__btn:hover { color: #fff; }
+.segmented__btn.is-active { background: var(--lime); color: var(--ink); }
+.segmented__btn:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
