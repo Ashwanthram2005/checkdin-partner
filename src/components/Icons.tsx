@@ -142,3 +142,25 @@ export const SearchIcon = ({ size = 18 }: P) => (
 export const ChevronDown = ({ size = 18 }: P) => (
   <svg {...svgProps(size)}><path d="M6 9.500l6 6 6-6" /></svg>
 );
+
+export const FilterIcon = ({ size = 20 }: P) => (
+  <svg {...svgProps(size)}><path d="M4 6.500h16M7 12h10M10 17.500h4" /></svg>
+);
+export const CloseIcon = ({ size = 20 }: P) => (
+  <svg {...svgProps(size)}><path d="M6 6l12 12M18 6L6 18" /></svg>
+);
+export const HomeIcon = ({ size = 22 }: P) => (
+  <svg {...svgProps(size)}><path d="M4 11l8-6.500 8 6.500v8a1.500 1.500 0 0 1-1.500 1.500h-3.500v-6h-6v6H5.500A1.500 1.500 0 0 1 4 19v-8z" /></svg>
+);
+export const BookingsIcon = ({ size = 22 }: P) => (
+  <svg {...svgProps(size)}><rect x="4.500" y="3.500" width="15" height="17" rx="2.500" /><path d="M8.500 9h7M8.500 13h7M8.500 17h4" /></svg>
+);
+export const TagIcon = ({ size = 22 }: P) => (
+  <svg {...svgProps(size)}><path d="M3.500 12.500V5a1.500 1.500 0 0 1 1.500-1.500h7.500l8 8-9 9-8-8z" /><circle cx="8.500" cy="8.500" r="1.200" /></svg>
+);
+export const ChartIcon = ({ size = 22 }: P) => (
+  <svg {...svgProps(size)}><path d="M4 20V10M10 20V4M16 20v-7M21 20H3" /></svg>
+);
+export const MoreIcon = ({ size = 22 }: P) => (
+  <svg {...svgProps(size)}><circle cx="5.500" cy="12" r="1.300" /><circle cx="12" cy="12" r="1.300" /><circle cx="18.500" cy="12" r="1.300" /></svg>
+);

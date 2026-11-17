@@ -1,268 +1,284 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import BottomNav from '../components/BottomNav';
 import {
-  CalendarIcon, CheckInIcon, CheckOutIcon, ChevronDown, ClockIcon, DownloadIcon, SearchIcon,
-  UsersIcon, XCircleIcon,
+  CalendarIcon, CheckInIcon, CheckOutIcon, ClockIcon, CloseIcon, DownloadIcon, FilterIcon,
+  PhoneIcon, SearchIcon, UsersIcon, XCircleIcon,
 } from '../components/Icons';
-import { BOOKINGS, STATUSES, type Booking, type BookingStatus } from '../data/bookings';
+import { BOOKINGS, demoBookings, STATUSES, type Booking, type BookingStatus } from '../data/bookings';
 import '../styles/bookings.css';
 
-type Tab = 'All Bookings' | BookingStatus;
-const TABS: Tab[] = ['All Bookings', ...STATUSES];
+type Tab = 'All' | BookingStatus;
+const TABS: Tab[] = ['All', ...STATUSES];
+
+interface Filters { from: string; to: string; duration: string; payment: string; status: string }
+const NO_FILTERS: Filters = { from: '', to: '', duration: 'all', payment: 'all', status: 'all' };
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const dayKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const fmtDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-const fmtTime = (iso: string) =>
-  new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase().replace(/^(\d):/, '0$1:');
+const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+const fmtTime = (iso: string) => {
+  const d = new Date(iso);
+  const h = d.getHours() % 12 || 12;
+  return `${pad(h)}:${pad(d.getMinutes())} ${d.getHours() < 12 ? 'am' : 'pm'}`;
+};
 const inr = (n: number) => '₹' + n.toLocaleString('en-IN');
+const pillClass = (s: BookingStatus) => 'pill pill--' + s.toLowerCase().replace(/\s+/g, '-');
 
-const statusClass = (s: BookingStatus) => 'pill pill--' + s.toLowerCase().replace(/\s+/g, '-');
-
-function minutesLeft(b: Booking, now: number) {
+function timeLeft(b: Booking, now: number) {
   if (b.status !== 'Pending Approval' || !b.requestExpiresAt) return null;
-  const ms = new Date(b.requestExpiresAt).getTime() - now;
-  if (ms <= 0) return '0:00';
-  const total = Math.floor(ms / 1000);
-  return `${Math.floor(total / 60)}:${pad(total % 60)}`;
+  const sec = Math.max(0, Math.floor((new Date(b.requestExpiresAt).getTime() - now) / 1000));
+  return `${Math.floor(sec / 60)}:${pad(sec % 60)}`;
 }
 
 function toCsv(rows: Booking[]) {
-  const head = ['Booking ID', 'Code', 'Guest', 'Phone', 'Check-in', 'Check-out', 'Duration (h)', 'Source', 'Amount', 'Payment', 'Status'];
   const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
-  const body = rows.map((b) => [
-    '#' + b.id, b.code, b.guest, b.phone, b.checkIn.replace('T', ' '), b.checkOut?.replace('T', ' ') ?? '',
-    b.durationHours, b.source, b.amount, b.payment, b.status,
-  ].map(esc).join(','));
+  const head = ['Booking ID', 'Code', 'Guest', 'Phone', 'Check-in', 'Check-out', 'Duration (h)', 'Source', 'Amount', 'Payment', 'Status'];
+  const body = rows.map((b) => ['#' + b.id, b.code, b.guest, b.phone, b.checkIn.replace('T', ' '), b.checkOut?.replace('T', ' ') ?? '', b.durationHours, b.source, b.amount, b.payment, b.status].map(esc).join(','));
   return [head.map(esc).join(','), ...body].join('\n');
 }
 
 export default function Bookings() {
-  const [bookings] = useState<Booking[]>(BOOKINGS);
+  const [params] = useSearchParams();
+  const [bookings, setBookings] = useState<Booking[]>(() => (params.get('demo') ? [...demoBookings(), ...BOOKINGS] : BOOKINGS));
   const [autoAccept, setAutoAccept] = useState(false);
-  const [tab, setTab] = useState<Tab>('All Bookings');
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [tab, setTab] = useState<Tab>('All');
+  const [query, setQuery] = useState('');
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  const [draft, setDraft] = useState<Filters>(NO_FILTERS);
+  const [sheet, setSheet] = useState(false);
 
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [bookingId, setBookingId] = useState('');
-  const [guest, setGuest] = useState('');
-  const [phone, setPhone] = useState('');
-  const [duration, setDuration] = useState('all');
-  const [payment, setPayment] = useState('all');
-  const [status, setStatus] = useState('all');
+  // tick once a second only while a request timer is running
+  const hasTimer = bookings.some((b) => b.status === 'Pending Approval' && b.requestExpiresAt);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!hasTimer) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [hasTimer]);
 
-  const now = Date.now();
+  useEffect(() => {
+    if (!sheet) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setSheet(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [sheet]);
+
   const today = new Date();
   const todayKey = dayKey(today);
   const todayLabel = today.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-
   const count = (s: BookingStatus) => bookings.filter((b) => b.status === s).length;
+  const activeFilters = (Object.keys(NO_FILTERS) as (keyof Filters)[]).filter((k) => filters[k] !== NO_FILTERS[k]).length;
 
   const rows = useMemo(() => {
-    const id = bookingId.trim().toLowerCase().replace(/^#/, '');
-    const g = guest.trim().toLowerCase();
-    const p = phone.replace(/\D/g, '');
+    const q = query.trim().toLowerCase().replace(/^#/, '');
+    const digits = q.replace(/\D/g, '');
     return bookings.filter((b) => {
       const day = b.checkIn.slice(0, 10);
-      if (tab !== 'All Bookings' && b.status !== tab) return false;
-      if (from && day < from) return false;
-      if (to && day > to) return false;
-      if (id && !b.id.toLowerCase().includes(id) && !b.code.toLowerCase().includes(id)) return false;
-      if (g && !b.guest.toLowerCase().includes(g)) return false;
-      if (p && !b.phone.includes(p)) return false;
-      if (duration !== 'all' && String(b.durationHours) !== duration) return false;
-      if (payment !== 'all' && b.payment !== payment) return false;
-      if (status !== 'all' && b.status !== status) return false;
+      if (tab !== 'All' && b.status !== tab) return false;
+      if (filters.status !== 'all' && b.status !== filters.status) return false;
+      if (filters.from && day < filters.from) return false;
+      if (filters.to && day > filters.to) return false;
+      if (filters.duration !== 'all' && String(b.durationHours) !== filters.duration) return false;
+      if (filters.payment !== 'all' && b.payment !== filters.payment) return false;
+      if (q && !(b.id.includes(q) || b.code.toLowerCase().includes(q) || b.guest.toLowerCase().includes(q) || (digits && b.phone.includes(digits)))) return false;
       return true;
     });
-  }, [bookings, tab, from, to, bookingId, guest, phone, duration, payment, status]);
+  }, [bookings, tab, query, filters]);
 
-  const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
-  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.id)));
-  const toggleOne = (id: string) =>
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
+  const setStatusOf = (id: string, status: BookingStatus) =>
+    setBookings((all) => all.map((b) => (b.id === id ? { ...b, status, requestExpiresAt: null } : b)));
 
   function exportCsv() {
-    const list = selected.size ? rows.filter((r) => selected.has(r.id)) : rows;
-    const url = URL.createObjectURL(new Blob([toCsv(list)], { type: 'text/csv;charset=utf-8' }));
+    const url = URL.createObjectURL(new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `bookings-${todayKey}.csv`;
-    a.click();
+    a.href = url; a.download = `bookings-${todayKey}.csv`; a.click();
     URL.revokeObjectURL(url);
   }
 
   const stats = [
-    { label: 'Total Bookings', value: bookings.length, sub: 'This period', icon: <CalendarIcon /> },
-    { label: 'Pending Approval', value: count('Pending Approval'), sub: 'Needs your action', icon: <ClockIcon />, accent: true },
-    { label: 'Today’s Check-ins', value: bookings.filter((b) => b.checkIn.slice(0, 10) === todayKey && b.status !== 'Cancelled').length, sub: todayLabel, icon: <CheckInIcon /> },
-    { label: 'Today’s Check-outs', value: bookings.filter((b) => b.checkOut?.slice(0, 10) === todayKey && b.status !== 'Cancelled').length, sub: todayLabel, icon: <CheckOutIcon /> },
-    { label: 'Active Guests', value: count('Checked In'), sub: 'In-house now', icon: <UsersIcon /> },
+    { label: 'Total', value: bookings.length, sub: 'This period', icon: <CalendarIcon /> },
+    { label: 'Pending', value: count('Pending Approval'), sub: 'Needs your action', icon: <ClockIcon />, accent: true },
+    { label: 'Check-ins', value: bookings.filter((b) => b.checkIn.slice(0, 10) === todayKey && b.status !== 'Cancelled').length, sub: todayLabel, icon: <CheckInIcon /> },
+    { label: 'Check-outs', value: bookings.filter((b) => b.checkOut?.slice(0, 10) === todayKey && b.status !== 'Cancelled').length, sub: todayLabel, icon: <CheckOutIcon /> },
+    { label: 'Active guests', value: count('Checked In'), sub: 'In-house now', icon: <UsersIcon /> },
     { label: 'Cancelled', value: count('Cancelled'), sub: 'This period', icon: <XCircleIcon /> },
   ];
 
+  const openSheet = () => { setDraft(filters); setSheet(true); };
+  const apply = () => { setFilters(draft); setSheet(false); };
+  const reset = () => { setDraft(NO_FILTERS); setFilters(NO_FILTERS); setSheet(false); };
+
   return (
-    <main className="bk">
-      <header className="bk__head">
-        <div>
-          <h1>Bookings</h1>
-          <p>Approve requests, run check-ins and check-outs, and manage guest details.</p>
-        </div>
-        <button type="button" className="bk__btn" onClick={exportCsv}>
-          <DownloadIcon /> Export CSV
-        </button>
-      </header>
-
-      <section className="bk__stats" aria-label="Summary">
-        {stats.map((s) => (
-          <div key={s.label} className={`stat${s.accent ? ' stat--accent' : ''}`}>
-            <div className="stat__label">{s.icon}{s.label}</div>
-            <div className="stat__value">{s.value}</div>
-            <div className="stat__sub">{s.sub}</div>
+    <div className="app">
+      <main className="bk">
+        <header className="bk__bar">
+          <div>
+            <h1>Bookings</h1>
+            <p>Approve requests, check guests in and out</p>
           </div>
-        ))}
-      </section>
-
-      <section className="bk__card approval">
-        <div>
-          <h2>{autoAccept ? 'Auto approval' : 'Manual approval'}</h2>
-          <p>
-            {autoAccept
-              ? 'Auto-accept is on — new requests are confirmed automatically.'
-              : 'Auto-accept is off — each request must be accepted before its timer runs out.'}
-          </p>
-        </div>
-        <label className="switch">
-          <span>Auto-accept bookings</span>
-          <input type="checkbox" role="switch" checked={autoAccept} onChange={(e) => setAutoAccept(e.target.checked)} />
-          <span className="switch__track" aria-hidden="true"><span className="switch__thumb" /></span>
-        </label>
-      </section>
-
-      <nav className="tabs" role="tablist" aria-label="Booking status">
-        {TABS.map((t) => (
-          <button
-            key={t} type="button" role="tab" aria-selected={tab === t}
-            className={`tabs__btn${tab === t ? ' is-active' : ''}`}
-            onClick={() => setTab(t)}
-          >
-            {t}
-            <span className="tabs__count">{t === 'All Bookings' ? bookings.length : count(t)}</span>
+          <button type="button" className="icon-btn" onClick={exportCsv} aria-label="Export CSV">
+            <DownloadIcon />
           </button>
-        ))}
-      </nav>
+        </header>
 
-      <section className="bk__card filters" aria-label="Filters">
-        <div className="filters__grid">
-          <div className="f f--dates">
-            <label htmlFor="from">Date range</label>
-            <div className="f__range">
-              <input id="from" type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} aria-label="From date" />
-              <span>to</span>
-              <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} aria-label="To date" />
+        <section className="stats" aria-label="Summary">
+          {stats.map((s) => (
+            <div key={s.label} className={`stat${s.accent ? ' stat--accent' : ''}`}>
+              <div className="stat__label">{s.icon}{s.label}</div>
+              <div className="stat__value">{s.value}</div>
+              <div className="stat__sub">{s.sub}</div>
             </div>
+          ))}
+        </section>
+
+        <section className="approval">
+          <div>
+            <h2>{autoAccept ? 'Auto approval' : 'Manual approval'}</h2>
+            <p>{autoAccept ? 'New requests are confirmed automatically.' : 'Accept each request before its timer runs out.'}</p>
           </div>
-          <div className="f">
-            <label htmlFor="bid">Booking ID</label>
-            <div className="f__input"><SearchIcon /><input id="bid" placeholder="CHK2451" value={bookingId} onChange={(e) => setBookingId(e.target.value)} /></div>
-          </div>
-          <div className="f">
-            <label htmlFor="gn">Guest name</label>
-            <div className="f__input"><SearchIcon /><input id="gn" placeholder="Search guest" value={guest} onChange={(e) => setGuest(e.target.value)} /></div>
-          </div>
-          <div className="f">
-            <label htmlFor="ph">Phone number</label>
-            <div className="f__input"><SearchIcon /><input id="ph" inputMode="tel" placeholder="Guest phone" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
-          </div>
-          <div className="f">
-            <label htmlFor="du">Duration</label>
-            <div className="f__select">
-              <select id="du" value={duration} onChange={(e) => setDuration(e.target.value)}>
-                <option value="all">All durations</option>
-                <option value="3">3 Hours</option>
-                <option value="6">6 Hours</option>
-                <option value="12">12 Hours</option>
-              </select>
-              <ChevronDown />
-            </div>
-          </div>
-          <div className="f">
-            <label htmlFor="pa">Payment status</label>
-            <div className="f__select">
-              <select id="pa" value={payment} onChange={(e) => setPayment(e.target.value)}>
-                <option value="all">All payments</option>
-                <option value="paid">Paid</option>
-                <option value="pending">Pending</option>
-                <option value="refunded">Refunded</option>
-                <option value="failed">Failed</option>
-              </select>
-              <ChevronDown />
-            </div>
-          </div>
-          <div className="f">
-            <label htmlFor="st">Booking status</label>
-            <div className="f__select">
-              <select id="st" value={status} onChange={(e) => setStatus(e.target.value)}>
-                <option value="all">All statuses</option>
-                {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-              <ChevronDown />
-            </div>
-          </div>
+          <label className="switch">
+            <input type="checkbox" role="switch" checked={autoAccept} onChange={(e) => setAutoAccept(e.target.checked)} aria-label="Auto-accept bookings" />
+            <span className="switch__track" aria-hidden="true"><span className="switch__thumb" /></span>
+          </label>
+        </section>
+
+        <div className="search">
+          <label className="search__box">
+            <SearchIcon />
+            <input
+              type="search" placeholder="Booking ID, guest or phone" value={query}
+              onChange={(e) => setQuery(e.target.value)} aria-label="Search bookings"
+            />
+          </label>
+          <button type="button" className="icon-btn icon-btn--filter" onClick={openSheet} aria-label={`Filters${activeFilters ? `, ${activeFilters} active` : ''}`}>
+            <FilterIcon />
+            {activeFilters > 0 && <span className="badge">{activeFilters}</span>}
+          </button>
         </div>
-        <p className="filters__count"><b>{rows.length}</b> {rows.length === 1 ? 'booking matches' : 'bookings match'} the current filters</p>
-      </section>
 
-      <section className="bk__card table-card">
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th className="c-check">
-                  <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Select all bookings" />
-                </th>
-                <th>Booking ID</th><th>Guest</th><th>Phone</th><th>Check-in</th><th>Check-out</th>
-                <th>Duration</th><th>Source</th><th className="num">Amount</th><th>Payment</th>
-                <th>Status</th><th>Extension</th><th>Time remaining</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 && (
-                <tr><td colSpan={13} className="empty">No bookings match these filters.</td></tr>
+        <nav className="chips" role="tablist" aria-label="Booking status">
+          {TABS.map((t) => (
+            <button key={t} type="button" role="tab" aria-selected={tab === t} className={`chip${tab === t ? ' is-active' : ''}`} onClick={() => setTab(t)}>
+              {t}<span className="chip__count">{t === 'All' ? bookings.length : count(t)}</span>
+            </button>
+          ))}
+        </nav>
+
+        <p className="result-count"><b>{rows.length}</b> {rows.length === 1 ? 'booking matches' : 'bookings match'} the current filters</p>
+
+        <ul className="cards">
+          {rows.length === 0 && (
+            <li className="empty">
+              <SearchIcon size={28} />
+              <strong>No bookings found</strong>
+              <span>Try a different search or clear the filters.</span>
+              {(activeFilters > 0 || query || tab !== 'All') && (
+                <button type="button" className="abtn-clear" onClick={() => { setQuery(''); setTab('All'); setFilters(NO_FILTERS); }}>Clear all</button>
               )}
-              {rows.map((b) => {
-                const left = minutesLeft(b, now);
-                return (
-                  <tr key={b.id} className={selected.has(b.id) ? 'is-selected' : ''}>
-                    <td className="c-check">
-                      <input type="checkbox" checked={selected.has(b.id)} onChange={() => toggleOne(b.id)} aria-label={`Select booking ${b.id}`} />
-                    </td>
-                    <td><strong className="mono">#{b.id}</strong><small>{b.code}</small></td>
-                    <td>
-                      <span className="guest"><span className="guest__avatar">{b.guest[0]?.toUpperCase()}</span>{b.guest}</span>
-                    </td>
-                    <td>{b.phone}</td>
-                    <td><strong>{fmtTime(b.checkIn)}</strong><small>{fmtDate(b.checkIn)}</small></td>
-                    <td>{b.checkOut ? <><strong>{fmtTime(b.checkOut)}</strong><small>{fmtDate(b.checkOut)}</small></> : <span className="muted">—</span>}</td>
-                    <td>{b.durationHours} Hours</td>
-                    <td>{b.source}</td>
-                    <td className="num"><strong>{inr(b.amount)}</strong></td>
-                    <td><span className={`pay pay--${b.payment}`}>{b.payment}</span></td>
-                    <td><span className={statusClass(b.status)}>{b.status}</span></td>
-                    <td className="muted">{b.extension}</td>
-                    <td>{left ? <span className="timer">{left}</span> : <span className="muted">—</span>}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+            </li>
+          )}
+          {rows.map((b) => {
+            const left = timeLeft(b, now);
+            return (
+              <li key={b.id} className="card-b">
+                <div className="card-b__top">
+                  <span className="avatar">{b.guest[0]?.toUpperCase()}</span>
+                  <div className="card-b__who">
+                    <strong>{b.guest}</strong>
+                    <small>#{b.id} · {b.code}</small>
+                  </div>
+                  <span className={pillClass(b.status)}>{b.status}</span>
+                </div>
+
+                <dl className="card-b__grid">
+                  <div><dt>Check-in</dt><dd>{fmtTime(b.checkIn)}</dd><small>{fmtDate(b.checkIn)}</small></div>
+                  <div><dt>Duration</dt><dd>{b.durationHours} Hours</dd><small>{b.checkOut ? `Out ${fmtTime(b.checkOut)}` : 'Check-out —'}</small></div>
+                  <div><dt>Amount</dt><dd>{inr(b.amount)}</dd><small className={`pay pay--${b.payment}`}>{b.payment}</small></div>
+                </dl>
+
+                <div className="card-b__meta">
+                  <span>{b.source}</span>
+                  <span>Extension: <b>{b.extension}</b></span>
+                  <a href={`tel:${b.phone}`} className="call" aria-label={`Call ${b.guest}`}><PhoneIcon size={16} />{b.phone}</a>
+                </div>
+
+                {left && <div className="timer-bar"><ClockIcon size={16} /> Respond within <b>{left}</b></div>}
+
+                {b.status === 'Pending Approval' && (
+                  <div className="actions">
+                    <button type="button" className="abtn abtn--ghost" onClick={() => setStatusOf(b.id, 'Cancelled')}>Decline</button>
+                    <button type="button" className="abtn abtn--lime" onClick={() => setStatusOf(b.id, 'Confirmed')}>Accept</button>
+                  </div>
+                )}
+                {b.status === 'Confirmed' && (
+                  <div className="actions"><button type="button" className="abtn abtn--dark" onClick={() => setStatusOf(b.id, 'Checked In')}>Check in guest</button></div>
+                )}
+                {b.status === 'Checked In' && (
+                  <div className="actions"><button type="button" className="abtn abtn--dark" onClick={() => setStatusOf(b.id, 'Checked Out')}>Check out guest</button></div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </main>
+
+      <BottomNav />
+
+      {sheet && (
+        <div className="sheet-wrap">
+          <button type="button" className="sheet-scrim" aria-label="Close filters" onClick={() => setSheet(false)} />
+          <div className="sheet" role="dialog" aria-modal="true" aria-label="Filters">
+            <div className="sheet__grab" aria-hidden="true" />
+            <header className="sheet__head">
+              <h2>Filters</h2>
+              <button type="button" className="icon-btn icon-btn--sm" onClick={() => setSheet(false)} aria-label="Close"><CloseIcon /></button>
+            </header>
+
+            <div className="sheet__body">
+              <fieldset>
+                <legend>Check-in date</legend>
+                <div className="dates">
+                  <label>From<input type="date" value={draft.from} max={draft.to || undefined} onChange={(e) => setDraft({ ...draft, from: e.target.value })} /></label>
+                  <label>To<input type="date" value={draft.to} min={draft.from || undefined} onChange={(e) => setDraft({ ...draft, to: e.target.value })} /></label>
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend>Duration</legend>
+                <div className="opts">
+                  {[['all', 'All'], ['3', '3 Hours'], ['6', '6 Hours'], ['12', '12 Hours']].map(([v, l]) => (
+                    <button key={v} type="button" aria-pressed={draft.duration === v} className={`opt${draft.duration === v ? ' is-on' : ''}`} onClick={() => setDraft({ ...draft, duration: v })}>{l}</button>
+                  ))}
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend>Payment status</legend>
+                <div className="opts">
+                  {[['all', 'All'], ['paid', 'Paid'], ['pending', 'Pending'], ['refunded', 'Refunded'], ['failed', 'Failed']].map(([v, l]) => (
+                    <button key={v} type="button" aria-pressed={draft.payment === v} className={`opt${draft.payment === v ? ' is-on' : ''}`} onClick={() => setDraft({ ...draft, payment: v })}>{l}</button>
+                  ))}
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend>Booking status</legend>
+                <div className="opts">
+                  {['all', ...STATUSES].map((v) => (
+                    <button key={v} type="button" aria-pressed={draft.status === v} className={`opt${draft.status === v ? ' is-on' : ''}`} onClick={() => setDraft({ ...draft, status: v })}>{v === 'all' ? 'All' : v}</button>
+                  ))}
+                </div>
+              </fieldset>
+            </div>
+
+            <footer className="sheet__foot">
+              <button type="button" className="abtn abtn--ghost" onClick={reset}>Reset</button>
+              <button type="button" className="abtn abtn--lime" onClick={apply}>Show results</button>
+            </footer>
+          </div>
         </div>
-      </section>
-    </main>
+      )}
+    </div>
   );
 }
