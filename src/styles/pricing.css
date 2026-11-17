@@ -60,3 +60,7 @@
 /* the field wrapper already shows the focus state */
 .app .stepper__field input:focus-visible { outline: none; }
 .toast { bottom: calc(var(--nav-h, 68px) + env(safe-area-inset-bottom, 0px) + 92px); }
+
+.rate__calc .fee { color: #c62828; }
+.rate__wk { margin: -4px 0 0; font-size: 13px; font-weight: 600; background: var(--lime-soft); border-radius: 10px; padding: 8px 10px; }
+.rate__wk span { color: var(--muted); font-weight: 500; }

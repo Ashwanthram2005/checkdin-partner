@@ -1,49 +1,44 @@
-export type SlotHours = 3 | 6 | 12;
-export const SLOTS: SlotHours[] = [3, 6, 12];
+export type SlotHours = 3 | 6 | 9 | 12;
+export const SLOTS: SlotHours[] = [3, 6, 9, 12];
 
-export interface RoomType {
-  id: string;
-  name: string;
-  rooms: number;
-  rates: Record<SlotHours, number>; // base price per stay, in ₹, before GST
-}
+export type Rates = Record<SlotHours, number>; // price per slot, in ₹, before GST
 
 export interface Adjustments {
   weekendOn: boolean;
-  weekendPct: number;   // surcharge on Fri–Sun
+  weekendPct: number;    // surcharge on Fri–Sun
   lastMinuteOn: boolean;
   lastMinutePct: number; // discount for same-day bookings
 }
 
 export interface PricingState {
-  rooms: RoomType[];
+  rates: Rates;
   adjustments: Adjustments;
 }
 
-/** Platform numbers (backend `settings` table: tax_rate, commission_rate, min_booking_amount). */
+/** Platform numbers. There is no commission: Checkdin charges a flat fee per booking. */
 export const GST_PCT = 18;
-export const COMMISSION_PCT = 15;
+export const PLATFORM_FEE = 79;                                  // ₹ per booking, before GST
+export const PLATFORM_FEE_GST = PLATFORM_FEE * (GST_PCT / 100);  // 14.22
+export const PLATFORM_FEE_TOTAL = Math.round(PLATFORM_FEE + PLATFORM_FEE_GST); // ₹93
 export const MIN_RATE = 100;
 
 /** MOCK DATA — replace with the real pricing API. */
 export const INITIAL_PRICING: PricingState = {
-  rooms: [
-    { id: 'std', name: 'Standard', rooms: 12, rates: { 3: 600, 6: 900, 12: 1400 } },
-    { id: 'dlx', name: 'Deluxe', rooms: 8, rates: { 3: 800, 6: 1200, 12: 1900 } },
-    { id: 'ste', name: 'Suite', rooms: 3, rates: { 3: 1200, 6: 1800, 12: 2800 } },
-  ],
+  rates: { 3: 600, 6: 900, 9: 1200, 12: 1400 },
   adjustments: { weekendOn: true, weekendPct: 15, lastMinuteOn: false, lastMinutePct: 10 },
 };
 
 export const guestPays = (rate: number) => Math.round(rate * (1 + GST_PCT / 100));
-export const youEarn = (rate: number) => Math.round(rate * (1 - COMMISSION_PCT / 100));
+/** What the property keeps: the slot price minus the platform fee (₹79 + 18% GST). */
+export const youEarn = (rate: number) => Math.max(0, rate - PLATFORM_FEE_TOTAL);
 export const withPct = (rate: number, pct: number) => Math.round(rate * (1 + pct / 100));
 
-/** Returns a message per slot when a rate is not allowed. */
-export function rateErrors(rates: Record<SlotHours, number>): Partial<Record<SlotHours, string>> {
+/** A longer slot should never cost less than a shorter one. */
+export function rateErrors(rates: Rates): Partial<Record<SlotHours, string>> {
   const e: Partial<Record<SlotHours, string>> = {};
-  for (const h of SLOTS) if (!(rates[h] >= MIN_RATE)) e[h] = `Minimum rate is ₹${MIN_RATE}`;
-  if (!e[6] && rates[6] < rates[3]) e[6] = 'Should be at least the 3-hour rate';
-  if (!e[12] && rates[12] < rates[6]) e[12] = 'Should be at least the 6-hour rate';
+  SLOTS.forEach((h, i) => {
+    if (!(rates[h] >= MIN_RATE)) e[h] = `Minimum rate is ₹${MIN_RATE}`;
+    else if (i > 0 && rates[h] < rates[SLOTS[i - 1]]) e[h] = `Should be at least the ${SLOTS[i - 1]}-hour rate`;
+  });
   return e;
 }

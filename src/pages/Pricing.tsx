@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import BottomNav from '../components/BottomNav';
 import { CheckCircleIcon, ClockIcon, InfoIcon, MinusIcon, PlusIcon } from '../components/Icons';
 import {
-  COMMISSION_PCT, GST_PCT, INITIAL_PRICING, SLOTS, guestPays, rateErrors, withPct, youEarn,
+  GST_PCT, INITIAL_PRICING, PLATFORM_FEE, PLATFORM_FEE_TOTAL, SLOTS, guestPays, rateErrors, withPct, youEarn,
   type Adjustments, type PricingState, type SlotHours,
 } from '../data/pricing';
 import '../styles/bookings.css';
@@ -15,16 +15,13 @@ const clampPct = (n: number) => Math.min(50, Math.max(1, n));
 export default function Pricing() {
   const [saved, setSaved] = useState<PricingState>(INITIAL_PRICING);
   const [draft, setDraft] = useState<PricingState>(INITIAL_PRICING);
-  const [roomId, setRoomId] = useState(INITIAL_PRICING.rooms[0].id);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(false);
 
-  const room = draft.rooms.find((r) => r.id === roomId)!;
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
-  const errorsByRoom = useMemo(() => Object.fromEntries(draft.rooms.map((r) => [r.id, rateErrors(r.rates)])), [draft.rooms]);
-  const hasErrors = Object.values(errorsByRoom).some((e) => Object.keys(e).length > 0);
-  const roomErrors = errorsByRoom[roomId];
-  const changedRooms = draft.rooms.filter((r, i) => JSON.stringify(r.rates) !== JSON.stringify(saved.rooms[i].rates)).map((r) => r.id);
+  const errors = useMemo(() => rateErrors(draft.rates), [draft.rates]);
+  const hasErrors = Object.keys(errors).length > 0;
+  const a = draft.adjustments;
 
   useEffect(() => {
     if (!toast) return;
@@ -33,8 +30,7 @@ export default function Pricing() {
   }, [toast]);
 
   const setRate = (h: SlotHours, value: number) =>
-    setDraft((d) => ({ ...d, rooms: d.rooms.map((r) => (r.id === roomId ? { ...r, rates: { ...r.rates, [h]: Math.max(0, Math.min(99999, value)) } } : r)) }));
-
+    setDraft((d) => ({ ...d, rates: { ...d.rates, [h]: Math.max(0, Math.min(99999, value)) } }));
   const setAdj = (patch: Partial<Adjustments>) => setDraft((d) => ({ ...d, adjustments: { ...d.adjustments, ...patch } }));
 
   async function save() {
@@ -50,39 +46,30 @@ export default function Pricing() {
     }
   }
 
-  const a = draft.adjustments;
-
   return (
     <div className="app">
       <main className="bk pr">
         <header className="bk__bar">
           <div>
             <h1>Pricing</h1>
-            <p>Set what guests pay for each stay length</p>
+            <p>Set the price for each slot</p>
           </div>
         </header>
 
-        <nav className="chips" role="tablist" aria-label="Room type">
-          {draft.rooms.map((r) => (
-            <button key={r.id} type="button" role="tab" aria-selected={roomId === r.id} className={`chip${roomId === r.id ? ' is-active' : ''}`} onClick={() => setRoomId(r.id)}>
-              {r.name}
-              <span className="chip__count">{changedRooms.includes(r.id) ? '•' : r.rooms}</span>
-            </button>
-          ))}
-        </nav>
-
-        <p className="pr__hint"><InfoIcon /> {room.rooms} {room.name} rooms use these rates. Prices are before {GST_PCT}% GST.</p>
+        <p className="pr__hint">
+          <InfoIcon /> Slots only: {SLOTS.join(', ')} hours. Prices are before {GST_PCT}% GST. Checkdin charges a platform fee of {inr(PLATFORM_FEE)} + {GST_PCT}% GST ({inr(PLATFORM_FEE_TOTAL)}) per booking, with no commission.
+        </p>
 
         <ul className="rates">
           {SLOTS.map((h) => {
-            const rate = room.rates[h];
-            const err = roomErrors[h];
+            const rate = draft.rates[h];
+            const err = errors[h];
             return (
               <li key={h} className={`rate${err ? ' rate--error' : ''}`}>
                 <div className="rate__head">
                   <span className="rate__icon"><ClockIcon size={18} /></span>
                   <strong>{h} Hours</strong>
-                  {saved.rooms.find((r) => r.id === roomId)!.rates[h] !== rate && <span className="rate__edited">Edited</span>}
+                  {saved.rates[h] !== rate && <span className="rate__edited">Edited</span>}
                 </div>
 
                 <div className="stepper">
@@ -101,21 +88,26 @@ export default function Pricing() {
                 {err ? (
                   <p className="rate__error" role="alert">{err}</p>
                 ) : (
-                  <dl className="rate__calc">
-                    <div><dt>Guest pays</dt><dd>{inr(guestPays(rate))}</dd></div>
-                    <div><dt>You earn</dt><dd className="earn">{inr(youEarn(rate))}</dd></div>
-                    {a.weekendOn && <div><dt>Fri–Sun</dt><dd>{inr(withPct(rate, a.weekendPct))}</dd></div>}
-                  </dl>
+                  <>
+                    <dl className="rate__calc">
+                      <div><dt>Guest pays</dt><dd>{inr(guestPays(rate))}</dd></div>
+                      <div><dt>Platform fee</dt><dd className="fee">−{inr(PLATFORM_FEE_TOTAL)}</dd></div>
+                      <div><dt>You earn</dt><dd className="earn">{inr(youEarn(rate))}</dd></div>
+                    </dl>
+                    {a.weekendOn && (
+                      <p className="rate__wk">Fri–Sun: {inr(withPct(rate, a.weekendPct))} <span>(guest pays {inr(guestPays(withPct(rate, a.weekendPct)))})</span></p>
+                    )}
+                  </>
                 )}
               </li>
             );
           })}
         </ul>
-        <p className="pr__fine">“You earn” is after the {COMMISSION_PCT}% Checkdin commission. Guest price includes {GST_PCT}% GST.</p>
+        <p className="pr__fine">“You earn” is the slot price minus the {inr(PLATFORM_FEE)} + {GST_PCT}% GST platform fee. The guest pays the slot price plus {GST_PCT}% GST.</p>
 
         <section className="adj" aria-label="Price adjustments">
           <h2>Adjustments</h2>
-          <p className="adj__sub">Applies to all room types</p>
+          <p className="adj__sub">Applies to all slots</p>
 
           <div className="adj__row">
             <div className="adj__text">
@@ -127,23 +119,19 @@ export default function Pricing() {
               <span className="switch__track" aria-hidden="true"><span className="switch__thumb" /></span>
             </label>
           </div>
-          {a.weekendOn && (
-            <PctStepper label="Weekend increase" value={a.weekendPct} sign="+" onChange={(v) => setAdj({ weekendPct: clampPct(v) })} />
-          )}
+          {a.weekendOn && <PctStepper label="Weekend increase" value={a.weekendPct} sign="+" onChange={(v) => setAdj({ weekendPct: clampPct(v) })} />}
 
           <div className="adj__row">
             <div className="adj__text">
               <strong>Last-minute discount</strong>
-              <small>Fill empty rooms with a same-day offer</small>
+              <small>Fill empty slots with a same-day offer</small>
             </div>
             <label className="switch">
               <input type="checkbox" role="switch" checked={a.lastMinuteOn} onChange={(e) => setAdj({ lastMinuteOn: e.target.checked })} aria-label="Last-minute discount" />
               <span className="switch__track" aria-hidden="true"><span className="switch__thumb" /></span>
             </label>
           </div>
-          {a.lastMinuteOn && (
-            <PctStepper label="Same-day discount" value={a.lastMinutePct} sign="−" onChange={(v) => setAdj({ lastMinutePct: clampPct(v) })} />
-          )}
+          {a.lastMinuteOn && <PctStepper label="Same-day discount" value={a.lastMinutePct} sign="−" onChange={(v) => setAdj({ lastMinutePct: clampPct(v) })} />}
         </section>
       </main>
 

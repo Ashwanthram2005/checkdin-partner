@@ -247,7 +247,7 @@ export default function Bookings() {
               <fieldset>
                 <legend>Duration</legend>
                 <div className="opts">
-                  {[['all', 'All'], ['3', '3 Hours'], ['6', '6 Hours'], ['12', '12 Hours']].map(([v, l]) => (
+                  {[['all', 'All'], ['3', '3 Hours'], ['6', '6 Hours'], ['9', '9 Hours'], ['12', '12 Hours']].map(([v, l]) => (
                     <button key={v} type="button" aria-pressed={draft.duration === v} className={`opt${draft.duration === v ? ' is-on' : ''}`} onClick={() => setDraft({ ...draft, duration: v })}>{l}</button>
                   ))}
                 </div>

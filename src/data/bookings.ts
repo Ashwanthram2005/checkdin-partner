@@ -15,7 +15,7 @@ export interface Booking {
   phone: string;
   checkIn: string;          // ISO local date-time
   checkOut: string | null;  // ISO local date-time, null until known
-  durationHours: 3 | 6 | 12;
+  durationHours: 3 | 6 | 9 | 12;
   source: string;
   amount: number;
   payment: PaymentStatus;
