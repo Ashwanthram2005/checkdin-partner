@@ -1,0 +1,18 @@
+.av { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.av__row { display: grid; grid-template-columns: 58px 1fr 1fr 64px; gap: 8px; align-items: center; background: var(--surface); border: 1.5px solid var(--line); border-radius: 18px; padding: 12px; }
+.av__row.is-changed { border-color: var(--lime); background: var(--lime-soft); }
+.av__row.is-bad { border-color: #e57373; }
+.av__date { display: flex; flex-direction: column; }
+.av__date strong { font-size: 15px; }
+.av__date small { color: var(--muted); font-size: 12px; }
+.av__step { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.av__step > span { font-size: 11px; color: var(--muted); }
+.av__step > div { display: flex; align-items: center; justify-content: space-between; gap: 4px; background: #f4f4f0; border-radius: 12px; padding: 3px; }
+.av__step button { width: 32px; height: 32px; flex: none; border: 0; border-radius: 9px; background: var(--surface); display: grid; place-items: center; cursor: pointer; color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.av__step button:disabled { opacity: .35; cursor: default; }
+.av__step output { font-weight: 800; font-size: 16px; min-width: 22px; text-align: center; font-variant-numeric: tabular-nums; }
+.av__open { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; }
+.av__open strong { font-size: 20px; font-weight: 800; }
+.av__open small, .av__open span { font-size: 11px; color: var(--muted); }
+.av__err { grid-column: 1 / -1; margin: 2px 0 0; }
+.av__all { align-self: flex-start; margin-top: 0; }

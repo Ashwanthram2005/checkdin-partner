@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
 import {
-  AlertIcon, BankIcon, CheckCircleIcon, CheckOutIcon, ChevronRightSm, CloseIcon, EyeIcon, EyeOffIcon, HelpIcon, HotelIdIcon,
+  AlertIcon, BankIcon, BellIcon, CameraIcon, CalendarIcon, CheckCircleIcon, ClockIcon, MessageIcon, ReportIcon, StarIcon, CheckOutIcon, ChevronRightSm, CloseIcon, EyeIcon, EyeOffIcon, HelpIcon, HotelIdIcon,
   LockIcon, PhoneIcon, ShieldIcon, UserIcon,
 } from '../components/Icons';
 import { changePassword, getPropertySettings, updatePropertySettings } from '../api/partner';
@@ -12,8 +13,18 @@ import { initials } from '../lib/format';
 import '../styles/bookings.css';
 import '../styles/more.css';
 
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 const PORTAL = 'https://partner.checkdin.in';
+
+const MANAGE = [
+  { to: '/extensions', label: 'Extensions', hint: 'Guests asking to stay longer', icon: <ClockIcon /> },
+  { to: '/availability', label: 'Availability', hint: 'Rooms offered to Checkdin, day by day', icon: <CalendarIcon /> },
+  { to: '/reviews', label: 'Reviews', hint: 'Read and reply to guest feedback', icon: <StarIcon size={20} /> },
+  { to: '/guests', label: 'Guests', hint: 'Message guests on WhatsApp or SMS', icon: <MessageIcon /> },
+  { to: '/notifications', label: 'Notifications', hint: 'Bookings, check-ins and requests', icon: <BellIcon /> },
+  { to: '/reports', label: 'Reports & forecast', hint: 'Revenue, stay lengths, guests', icon: <ReportIcon /> },
+  { to: '/property', label: 'Photos & amenities', hint: 'What guests see on your listing', icon: <CameraIcon /> },
+];
 
 export default function More() {
   const { session, role, property, can, signOut } = useAuth();
@@ -63,6 +74,17 @@ export default function More() {
         </section>
 
         {(error || settings.error) && <div className="alert" role="alert"><AlertIcon /> {error ?? settings.error} <button type="button" className="link-btn" onClick={() => { setError(null); settings.reload(); }}>Retry</button></div>}
+
+        <h2 className="group">Manage</h2>
+        <ul className="list manage">
+          {MANAGE.map((m) => (
+            <li key={m.to}><Link to={m.to} className="row row--link">
+              <span className="row__icon">{m.icon}</span>
+              <span className="row__text"><strong>{m.label}</strong><small>{m.hint}</small></span>
+              <ChevronRightSm />
+            </Link></li>
+          ))}
+        </ul>
 
         <h2 className="group">Bookings</h2>
         <ul className="list">

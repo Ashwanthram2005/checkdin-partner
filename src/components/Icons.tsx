@@ -206,3 +206,22 @@ export const VolumeIcon = ({ size = 20 }: P) => (
 export const ChevronRightSm = ({ size = 18 }: P) => (
   <svg {...svgProps(size)}><path d="M9 5.500l6.500 6.500L9 18.500" /></svg>
 );
+
+export const StarIcon = ({ size = 16 }: P) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.200l2.600 5.500 6 .8-4.400 4.200 1.100 6-5.300-2.900-5.300 2.900 1.100-6L3.400 9.500l6-.8L12 3.200z" /></svg>
+);
+export const CameraIcon = ({ size = 20 }: P) => (
+  <svg {...svgProps(size)}><path d="M4 8.500A1.500 1.500 0 0 1 5.500 7h2.200l1.300-2h6l1.300 2h2.200A1.500 1.500 0 0 1 20 8.500v9a1.500 1.500 0 0 1-1.500 1.500h-13A1.500 1.500 0 0 1 4 17.500v-9z" /><circle cx="12" cy="13" r="3.300" /></svg>
+);
+export const TrashIcon = ({ size = 18 }: P) => (
+  <svg {...svgProps(size)}><path d="M4.500 7h15M9.500 7V4.500h5V7M6.500 7l.8 12h9.400l.8-12M10 11v5M14 11v5" /></svg>
+);
+export const MessageIcon = ({ size = 20 }: P) => (
+  <svg {...svgProps(size)}><path d="M4 6.500A2.500 2.500 0 0 1 6.500 4h11A2.500 2.500 0 0 1 20 6.500v7a2.500 2.500 0 0 1-2.500 2.500H10l-4.500 3.500V16A2.500 2.500 0 0 1 4 13.500v-7z" /></svg>
+);
+export const ReportIcon = ({ size = 20 }: P) => (
+  <svg {...svgProps(size)}><path d="M5 20V10M10 20V4M15 20v-8M20 20v-5" /><path d="M3.500 20.500h17" /></svg>
+);
+export const RefreshIcon = ({ size = 18 }: P) => (
+  <svg {...svgProps(size)}><path d="M19.500 12a7.500 7.500 0 1 1-2.300-5.400M19.500 4.500v4h-4" /></svg>
+);

@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
 import BottomNav from '../components/BottomNav';
+import PayoutRequest from '../components/PayoutRequest';
 import { AlertIcon, ArrowUpIcon, BankIcon, ChartBarIcon, InfoIcon, TableIcon } from '../components/Icons';
-import { getBookings, getPayouts, getPropertySettings, type Booking } from '../api/partner';
+import { getBookings, getPayouts, getPropertySettings } from '../api/partner';
 import { useApi } from '../api/useApi';
 import { useAuth } from '../auth/AuthContext';
-import { addDays, dayKey, fmtDate, fmtDayMonth, inr } from '../lib/format';
+import { addDays, fmtDate, fmtDayMonth, inr } from '../lib/format';
+import { dayStats, niceMax, sum, tickLabel } from '../lib/stats';
 import '../styles/bookings.css';
 import '../styles/revenue.css';
 
@@ -15,36 +17,10 @@ const PERIODS: { id: Period; label: string }[] = [
   { id: 'month', label: 'This month' },
 ];
 
-/** Stays that have actually happened count as earnings. */
-const EARNED = new Set(['Checked in', 'Completed']);
-
-interface Day { date: string; label: string; bookings: number; base: number; fee: number; tax: number; paid: number; net: number }
-
-function dayStats(bookings: Booking[], from: Date, to: Date): Day[] {
-  const days: Day[] = [];
-  for (let d = from; d <= to; d = addDays(d, 1)) days.push({ date: dayKey(d), label: '', bookings: 0, base: 0, fee: 0, tax: 0, paid: 0, net: 0 });
-  const idx = new Map(days.map((d, i) => [d.date, i]));
-  for (const b of bookings) {
-    if (!b.checkIn || !EARNED.has(b.status)) continue;
-    const i = idx.get(dayKey(b.checkIn));
-    if (i === undefined) continue;
-    const d = days[i];
-    d.bookings += 1; d.base += b.base; d.fee += b.platformFee; d.tax += b.tax; d.paid += b.amount;
-    d.net += b.base - b.platformFee;
-  }
-  return days;
-}
-const sum = (days: Day[]) => days.reduce((t, d) => ({ bookings: t.bookings + d.bookings, base: t.base + d.base, fee: t.fee + d.fee, tax: t.tax + d.tax, paid: t.paid + d.paid, net: t.net + d.net }), { bookings: 0, base: 0, fee: 0, tax: 0, paid: 0, net: 0 });
-
-function niceMax(v: number) {
-  if (v <= 0) return 1000;
-  const p = 10 ** Math.floor(Math.log10(v));
-  return ([1, 1.2, 1.6, 2, 3, 4, 6, 8, 10].find((x) => x >= v / p) ?? 10) * p;
-}
-const tickLabel = (v: number, compact: boolean) => (compact && v >= 1000 ? `${+(v / 1000).toFixed(1)}K` : v.toLocaleString('en-IN'));
-
 export default function Revenue() {
-  const { session } = useAuth();
+  const { session, role } = useAuth();
+  const [payoutOpen, setPayoutOpen] = useState(false);
+  const isOwner = role?.id === 'prole1';
   const books = useApi(getBookings);
   const payouts = useApi(getPayouts);
   const settings = useApi(() => getPropertySettings(session?.hotelId ?? ''), [session?.hotelId]);
@@ -190,6 +166,8 @@ export default function Revenue() {
             {bankReady ? `Status: ${bank!.status}` : 'Add and verify your bank details on the partner portal (partner.checkdin.in → Settings) so payouts can reach you.'}
           </p>
           {bank && <div className="payout-next__foot"><span>PAN: <b>{bank.panStatus || '—'}</b></span><span>GST: <b>{bank.gstStatus || '—'}</b></span></div>}
+          {isOwner && bankReady && <button type="button" className="abtn abtn--dark payout-btn" onClick={() => setPayoutOpen(true)}>Request payout</button>}
+          {!isOwner && <p className="payout-next__sub">Only the property owner can request a payout.</p>}
         </section>
 
         {payouts.loading && !payouts.data && <p className="muted-note">Loading payouts…</p>}
@@ -206,6 +184,7 @@ export default function Revenue() {
         </ul>
       </main>
       <BottomNav />
+      {payoutOpen && bank && <PayoutRequest account={`${bank.bankName} ••${bank.accountLast4}`} onClose={() => setPayoutOpen(false)} onDone={() => { setPayoutOpen(false); payouts.reload(); }} />}
     </div>
   );
 }

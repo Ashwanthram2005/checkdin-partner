@@ -97,3 +97,12 @@
 .pill--paid, .pill--completed, .pill--settled, .pill--success { background: #e7f8ec; color: #1a7f37; border-color: #b6e3c4; }
 .pill--pending, .pill--on-process, .pill--processing, .pill--requested { background: #fff6e0; color: #9a6700; border-color: #f3dc9b; }
 .pill--failed, .pill--rejected { background: #fdecec; color: #c62828; border-color: #f5c2c2; }
+
+.kv { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; }
+.kv div { display: flex; flex-direction: column; gap: 3px; }
+.kv dt { color: var(--muted); font-size: 12px; }
+.kv dd { margin: 0; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.kv dd.big { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+.fc__value { color: var(--ink) !important; font-size: 44px; margin: 0; }
+
+.payout-btn { margin-top: 12px; flex: none; width: 100%; }

@@ -237,9 +237,22 @@ export interface PropertySettings {
   city: string;
   autoAcceptBookings: boolean;
   pauseBookings: boolean;
+  description: string;
+  amenities: string[];
+  images: PhotoItem[];
   banking: { status: string; bankName: string; accountLast4: string; panStatus: string; gstStatus: string };
   account: { email: string; phone: string; partnerName: string; partnerStatus: string };
 }
+export interface PhotoItem { id: string; url: string; category: string; cover: boolean }
+const toPhoto = (v: unknown, i: number): PhotoItem | null => {
+  if (typeof v === 'string') return v ? { id: v, url: v, category: '', cover: i === 0 } : null;
+  const o = (v ?? {}) as Raw;
+  const url = String(o.url ?? o.src ?? o.dataUrl ?? o.image ?? '');
+  if (!url) return null;
+  return { id: String(o.id ?? o.photoId ?? url), url, category: String(o.category ?? ''), cover: !!(o.cover ?? o.isCover ?? o.is_cover) || (o.cover === undefined && i === 0) };
+};
+export const toPhotos = (v: unknown): PhotoItem[] => (Array.isArray(v) ? v : []).map(toPhoto).filter((x): x is PhotoItem => !!x);
+
 export async function getPropertySettings(id: string): Promise<PropertySettings> {
   const s = await api<Raw>(`/api/partner/properties/${enc(id)}/settings`);
   const b = (s.banking ?? {}) as Raw;
@@ -247,6 +260,9 @@ export async function getPropertySettings(id: string): Promise<PropertySettings>
   return {
     propertyId: String(s.propertyId ?? id), name: String(s.name ?? ''), address: String(s.address ?? ''), city: String(s.city ?? ''),
     autoAcceptBookings: !!s.autoAcceptBookings, pauseBookings: !!s.pauseBookings,
+    description: String(s.description ?? ''),
+    amenities: Array.isArray(s.amenities) ? (s.amenities as unknown[]).map(String) : [],
+    images: toPhotos(s.images),
     banking: {
       status: String(b.status ?? ''), bankName: String(b.bankName ?? ''), accountLast4: String(b.accountLast4 ?? ''),
       panStatus: String(b.panStatus ?? ''), gstStatus: String(b.gstStatus ?? ''),
@@ -254,7 +270,7 @@ export async function getPropertySettings(id: string): Promise<PropertySettings>
     account: { email: String(a.email ?? ''), phone: String(a.phone ?? ''), partnerName: String(a.partnerName ?? ''), partnerStatus: String(a.partnerStatus ?? '') },
   };
 }
-export const updatePropertySettings = (id: string, patch: Partial<Pick<PropertySettings, 'autoAcceptBookings' | 'pauseBookings'>>) =>
+export const updatePropertySettings = (id: string, patch: Partial<Pick<PropertySettings, 'autoAcceptBookings' | 'pauseBookings' | 'amenities' | 'description'>>) =>
   api<unknown>(`/api/partner/properties/${enc(id)}/settings`, { method: 'PUT', body: patch });
 
 /* ───────────── payouts ───────────── */
@@ -269,3 +285,48 @@ export const getPayouts = async (): Promise<Payout[]> =>
     reference: String(r.utr ?? r.reference ?? ''),
     date: date(r.paid_at ?? r.requested_at ?? r.created_at),
   }));
+
+/* ───────────── photos ───────────── */
+
+export const uploadPhoto = async (id: string, dataUrl: string, category?: string, name?: string) =>
+  toPhotos(((await api<Raw>(`/api/partner/properties/${enc(id)}/photos`, { method: 'POST', body: { dataUrl, ...(category ? { category } : {}), ...(name ? { name } : {}) } })).images));
+export const deletePhoto = async (id: string, photoId: string) =>
+  toPhotos(((await api<Raw>(`/api/partner/properties/${enc(id)}/photos/${enc(photoId)}`, { method: 'DELETE' })).images));
+export const setCoverPhoto = async (id: string, photoId: string) =>
+  toPhotos(((await api<Raw>(`/api/partner/properties/${enc(id)}/photos/cover`, { method: 'POST', body: { photoId } })).images));
+
+/* ───────────── reviews ───────────── */
+
+export interface Review {
+  id: string; guest: string; rating: number; title: string; body: string; createdAt: Date | null;
+  response: string | null; repliedOn: Date | null; room: string; hours: number | null;
+}
+export const getReviews = async (): Promise<Review[]> =>
+  unwrap<Raw>(await api('/api/partner/reviews')).map((r) => ({
+    id: String(r.id), guest: String(r.customer_name ?? r.guest_name ?? 'Guest'), rating: num(r.rating),
+    title: String(r.title ?? ''), body: String(r.body ?? r.comment ?? ''), createdAt: date(r.created_at),
+    response: r.response ? String(r.response) : null, repliedOn: date(r.replied_on), room: String(r.room ?? ''),
+    hours: r.duration ? num(r.duration) : null,
+  }));
+export const replyToReview = (id: string, reply: string) =>
+  api<unknown>(`/api/partner/reviews/${enc(id)}/reply`, { method: 'POST', body: { reply } });
+
+/* ───────────── availability ───────────── */
+
+export interface DayAvailability { date: string; day: string; allocated: number; booked: number; blocked: number }
+export const getAvailability = async (): Promise<DayAvailability[]> =>
+  unwrap<Raw>(await api('/api/partner/availability')).map((r) => ({
+    date: String(r.date ?? '').slice(0, 10), day: String(r.day ?? ''), allocated: num(r.allocated), booked: num(r.booked), blocked: num(r.blocked),
+  }));
+/** Only these three fields are ever sent. */
+export const saveAvailability = (dateKey: string, v: { day: string; allocated: number; blocked: number }) =>
+  api<unknown>(`/api/partner/availability/${dateKey}`, { method: 'PUT', body: { day: v.day, allocated: v.allocated, blocked: v.blocked } });
+
+/* ───────────── payout request (owner, needs an OTP) ───────────── */
+
+export const sendPayoutOtp = () =>
+  api<{ destination?: string; resendIn?: number }>('/api/partner/otp/send', { method: 'POST', body: { purpose: 'payout' } });
+export const verifyPayoutOtp = (code: string) =>
+  api<{ challengeToken?: string }>('/api/partner/otp/verify', { method: 'POST', body: { purpose: 'payout', code } });
+export const requestPayout = (challengeToken: string) =>
+  api<unknown>('/api/partner/payouts/request', { method: 'POST', body: { challengeToken } });

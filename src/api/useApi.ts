@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+export const REFRESH_EVENT = 'checkdin:refresh';
+
 export interface ApiState<T> {
   data: T | null;
   error: string | null;
@@ -32,5 +34,12 @@ export function useApi<T>(load: () => Promise<T>, deps: unknown[] = []): ApiStat
   }, [tick, ...deps]);
 
   const reload = useCallback(() => setTick((t) => t + 1), []);
+
+  // other parts of the app (like the new-request alert) can ask every list to refresh
+  useEffect(() => {
+    const on = () => setTick((t) => t + 1);
+    window.addEventListener(REFRESH_EVENT, on);
+    return () => window.removeEventListener(REFRESH_EVENT, on);
+  }, []);
   return { data, error, loading, reload };
 }

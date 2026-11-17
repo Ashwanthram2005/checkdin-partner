@@ -2,10 +2,11 @@ import { Link } from 'react-router-dom';
 import { useMemo } from 'react';
 import BottomNav from '../components/BottomNav';
 import ExtensionRequests from '../components/ExtensionRequests';
-import { AlertIcon, BookingsIcon, CalendarIcon, CheckInIcon, ChevronRightSm, UsersIcon } from '../components/Icons';
+import { AlertIcon, BellIcon, BookingsIcon, CalendarIcon, CheckInIcon, ChevronRightSm, UsersIcon } from '../components/Icons';
 import { getBookings, getDashboard, getPropertySettings, updatePropertySettings } from '../api/partner';
 import { useApi } from '../api/useApi';
 import { useAuth } from '../auth/AuthContext';
+import { useActivity } from '../lib/activity';
 import { dayKey, fmtTime, inr, initials } from '../lib/format';
 import { useState } from 'react';
 import '../styles/bookings.css';
@@ -15,6 +16,7 @@ export default function Home() {
   const { session, property, can } = useAuth();
   const propertyId = session?.hotelId ?? '';
   const dash = useApi(getDashboard);
+  const activity = useActivity();
   const books = useApi(getBookings);
   const settings = useApi(() => getPropertySettings(propertyId), [propertyId]);
   const [toggling, setToggling] = useState(false);
@@ -56,7 +58,12 @@ export default function Home() {
             <h1>Hello{first ? `, ${first}` : ''}</h1>
             <p>{property?.name ?? 'Your property'}{property?.city ? ` · ${property.city}` : ''}</p>
           </div>
-          <span className="avatar avatar--lg" aria-hidden="true">{initials(session?.name ?? '')}</span>
+          <div className="home__right">
+            <Link to="/notifications" className="icon-btn bell" aria-label={`Notifications${activity.unread ? `, ${activity.unread} new` : ''}`}>
+              <BellIcon />{activity.unread > 0 && <span className="badge">{activity.unread > 9 ? '9+' : activity.unread}</span>}
+            </Link>
+            <span className="avatar avatar--lg" aria-hidden="true">{initials(session?.name ?? '')}</span>
+          </div>
         </header>
 
         {(dash.error || books.error) && (
