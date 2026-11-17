@@ -164,3 +164,16 @@ export const ChartIcon = ({ size = 22 }: P) => (
 export const MoreIcon = ({ size = 22 }: P) => (
   <svg {...svgProps(size)}><circle cx="5.500" cy="12" r="1.300" /><circle cx="12" cy="12" r="1.300" /><circle cx="18.500" cy="12" r="1.300" /></svg>
 );
+
+export const PlusIcon = ({ size = 20 }: P) => (
+  <svg {...svgProps(size)}><path d="M12 5v14M5 12h14" /></svg>
+);
+export const MinusIcon = ({ size = 20 }: P) => (
+  <svg {...svgProps(size)}><path d="M5 12h14" /></svg>
+);
+export const CheckCircleIcon = ({ size = 20 }: P) => (
+  <svg {...svgProps(size)}><circle cx="12" cy="12" r="8.500" /><path d="M8.500 12.200l2.400 2.400 4.600-4.800" /></svg>
+);
+export const InfoIcon = ({ size = 16 }: P) => (
+  <svg {...svgProps(size)}><circle cx="12" cy="12" r="8.500" /><path d="M12 11v5M12 7.800v.1" /></svg>
+);

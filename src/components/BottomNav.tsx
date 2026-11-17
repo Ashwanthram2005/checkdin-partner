@@ -4,7 +4,7 @@ import { BookingsIcon, ChartIcon, HomeIcon, MoreIcon, TagIcon } from './Icons';
 const ITEMS = [
   { to: '/app/home', label: 'Home', icon: <HomeIcon /> },
   { to: '/bookings', label: 'Bookings', icon: <BookingsIcon /> },
-  { to: '/app/pricing', label: 'Pricing', icon: <TagIcon /> },
+  { to: '/pricing', label: 'Pricing', icon: <TagIcon /> },
   { to: '/app/revenue', label: 'Revenue', icon: <ChartIcon /> },
   { to: '/app/more', label: 'More', icon: <MoreIcon /> },
 ];

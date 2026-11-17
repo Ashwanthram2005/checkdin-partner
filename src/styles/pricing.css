@@ -1,0 +1,62 @@
+.pr { gap: 14px; }
+.pr__hint { display: flex; align-items: flex-start; gap: 8px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.pr__hint svg { flex: none; margin-top: 1px; }
+.pr__fine { margin: -4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+
+.rates { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.rate { background: var(--surface); border: 1.5px solid var(--line); border-radius: 20px; padding: 16px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
+.rate--error { border-color: #f1a9a9; }
+.rate__head { display: flex; align-items: center; gap: 10px; }
+.rate__head strong { font-size: 17px; font-weight: 700; flex: 1; }
+.rate__icon { width: 34px; height: 34px; border-radius: 50%; background: var(--lime); display: grid; place-items: center; }
+.rate__edited { font-size: 12px; font-weight: 600; background: #f0f0ec; color: var(--ink); border-radius: 8px; padding: 4px 8px; }
+
+.stepper { display: flex; align-items: center; gap: 10px; }
+.stepper__btn { width: 52px; height: 52px; flex: none; border-radius: 16px; border: 1.5px solid #d9d9d4; background: var(--surface); color: var(--ink); display: grid; place-items: center; cursor: pointer; }
+.stepper__btn:active { transform: scale(.94); background: #f4f4f0; }
+.stepper__field { flex: 1; min-width: 0; height: 52px; display: flex; align-items: center; justify-content: center; gap: 4px; border: 1.5px solid var(--line); border-radius: 16px; background: #fbfbf9; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+.stepper__field:focus-within { border-color: var(--ink); background: var(--surface); }
+.stepper__field span { color: var(--muted); font-weight: 600; }
+.stepper__field input { width: 6ch; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; text-align: left; color: var(--ink); }
+.rate--error .stepper__field { border-color: #e57373; }
+.stepper--sm .stepper__btn { width: 40px; height: 40px; border-radius: 12px; }
+.stepper--sm { gap: 8px; }
+
+.rate__calc { margin: 0; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.rate__calc dt { color: var(--muted); font-size: 12px; margin-bottom: 3px; }
+.rate__calc dd { margin: 0; font-size: 16px; font-weight: 700; }
+.rate__calc .earn { color: #1a7f37; }
+.rate__error { margin: 0; color: #c62828; font-size: 13px; font-weight: 500; }
+
+.adj { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.adj h2 { font-size: 17px; font-weight: 800; }
+.adj__sub { margin: -10px 0 0; color: var(--muted); font-size: 13px; }
+.adj__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.adj__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.adj__text strong { font-size: 15px; font-weight: 700; }
+.adj__text small { color: var(--muted); font-size: 13px; line-height: 1.35; }
+.pct { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--lime-soft); border: 1px solid var(--lime); border-radius: 14px; padding: 10px 12px; font-size: 14px; font-weight: 600; margin-top: -4px; }
+.pct__val { min-width: 54px; text-align: center; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+.savebar {
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 15; width: 100%; max-width: 480px;
+  bottom: calc(var(--nav-h, 68px) + env(safe-area-inset-bottom, 0px));
+  display: flex; gap: 10px; padding: 12px 16px; background: rgba(255,255,255,.97); border-top: 1px solid var(--line);
+  box-shadow: 0 -6px 20px rgba(0,0,0,.06);
+}
+.savebar .abtn--ghost { flex: 0 0 32%; }
+.savebar .abtn:disabled { opacity: .55; cursor: not-allowed; }
+.pr { padding-bottom: calc(var(--nav-h, 68px) + env(safe-area-inset-bottom, 0px) + 96px); }
+
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 30;
+  bottom: calc(var(--nav-h, 68px) + env(safe-area-inset-bottom, 0px) + 18px);
+  display: inline-flex; align-items: center; gap: 8px; background: var(--ink); color: #fff;
+  padding: 12px 18px; border-radius: 14px; font-size: 15px; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,.25);
+  animation: rise .25s ease;
+}
+.toast svg { color: var(--lime); }
+
+/* the field wrapper already shows the focus state */
+.app .stepper__field input:focus-visible { outline: none; }
+.toast { bottom: calc(var(--nav-h, 68px) + env(safe-area-inset-bottom, 0px) + 92px); }
