@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
-import { getBookings, getExtensions } from '../api/partner';
+import { getBookings, getConversations, getExtensions } from '../api/partner';
 import { REFRESH_EVENT } from '../api/useApi';
 import { BellIcon, CloseIcon } from './Icons';
 import { inr } from '../lib/format';
@@ -41,7 +41,7 @@ export default function Alerts() {
     async function poll() {
       if (document.visibilityState === 'hidden') return;
       try {
-        const [ext, books] = await Promise.all([getExtensions(), getBookings()]);
+        const [ext, books, chats] = await Promise.all([getExtensions(), getBookings(), getConversations().catch(() => ({ available: false, items: [] }))]);
         const now = Date.now();
         const found: Banner[] = [];
         for (const b of ext) {
@@ -53,6 +53,12 @@ export default function Alerts() {
         for (const b of books) {
           if (b.createdAt && now - b.createdAt.getTime() < 10 * 60_000 && b.status !== 'Cancelled' && b.status !== 'Expired') {
             found.push({ id: `b-${b.id}`, title: 'New booking', body: `${b.guest} booked ${b.stayLabel} (${inr(b.amount)}).`, link: '/bookings' });
+          }
+        }
+        for (const c of chats.items) {
+          if (c.unread > 0 && c.lastFrom === 'guest' && c.lastAt) {
+            const who = books.find((b) => b.id === c.bookingId)?.guest ?? 'A guest';
+            found.push({ id: `m-${c.bookingId}-${c.lastAt.getTime()}`, title: `New message from ${who}`, body: c.last.slice(0, 90), link: `/messages/${encodeURIComponent(c.bookingId)}` });
           }
         }
         if (stop) return;

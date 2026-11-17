@@ -166,7 +166,7 @@ export default function Revenue() {
             </div>
           </div>
           <p className="payout-next__sub">
-            {bankReady ? `Status: ${bank!.status}` : 'Add and verify your bank details on the partner portal (partner.checkdin.in → Settings) so payouts can reach you.'}
+            {bankReady ? `Status: ${bank!.status}` : 'Bank details can only be added or changed on the Checkdin partner website, on a computer (partner.checkdin.in → Settings), so payouts can reach you.'}
           </p>
           {bank && <div className="payout-next__foot"><span>PAN: <b>{bank.panStatus || '—'}</b></span><span>GST: <b>{bank.gstStatus || '—'}</b></span></div>}
           {isOwner && bankReady && <button type="button" className="abtn abtn--dark payout-btn" onClick={() => setPayoutOpen(true)}>Request payout</button>}

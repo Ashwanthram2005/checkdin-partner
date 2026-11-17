@@ -50,6 +50,14 @@ Until then the app alerts only while it is open.
   Allow only `day`, `allocated`, `booked`, `blocked`. The app only ever sends `day`, `allocated`, `blocked`.
 * The portal's availability "Save" sends the word `today` instead of a date, so it saves nothing, and it hides the error.
 
+## Changes in v0.4
+* **Online / Offline** replaces auto-accept. One switch (Home and More): online = guests can book you; offline = they can't.
+  (It still uses the server's `pauseBookings` setting.)
+* **PAN, GST and bank** are view-only in the app, with status chips and a note that they can only be changed on the
+  partner website on a computer.
+* **In-app messaging** (Messages): chat with guests inside the app, quick templates, unread badges, new-message alerts.
+  It needs the server endpoints in `docs/MESSAGING_API.md` (patch in `docs/backend-messaging/`) and a chat screen in the guest app.
+
 ## Platform fee (as told by the owner)
 Checkdin's fee is **₹79 + 18% GST (₹93.22) per stay booking**, taken from the property's earnings.
 **Extension (stay-longer) charges carry no platform fee.** `src/lib/fees.ts` holds the numbers; Revenue, Reports,

@@ -216,3 +216,7 @@ export const ReportIcon = ({ size = 20 }: P) => (
 export const RefreshIcon = ({ size = 18 }: P) => (
   <svg {...svgProps(size)}><path d="M19.500 12a7.500 7.500 0 1 1-2.300-5.400M19.500 4.500v4h-4" /></svg>
 );
+
+export const SendIcon = ({ size = 20 }: P) => (
+  <svg {...svgProps(size)}><path d="M20.500 3.500L10 14M20.500 3.500l-6.500 17-3.500-6.500L4 10.500l16.500-7z" /></svg>
+);

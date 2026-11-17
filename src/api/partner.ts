@@ -348,3 +348,49 @@ export const verifyPayoutOtp = (code: string) =>
   api<{ challengeToken?: string }>('/api/partner/otp/verify', { method: 'POST', body: { purpose: 'payout', code } });
 export const requestPayout = (challengeToken: string) =>
   api<unknown>('/api/partner/payouts/request', { method: 'POST', body: { challengeToken } });
+
+/* ───────────── in-app guest messaging ─────────────
+ * Needs the messaging endpoints on the server (see docs/MESSAGING_API.md).
+ * When they are missing (404/501) `available` is false and the app falls back to WhatsApp / SMS. */
+
+export interface ChatMessage { id: string; from: 'partner' | 'guest'; body: string; at: Date; read: boolean }
+export interface Conversation { bookingId: string; last: string; lastFrom: 'partner' | 'guest'; lastAt: Date | null; unread: number }
+
+const missing = (e: unknown) => (e as { status?: number })?.status === 404 || (e as { status?: number })?.status === 501;
+
+export async function getConversations(): Promise<{ available: boolean; items: Conversation[] }> {
+  try {
+    const rows = unwrap<Raw>(await api('/api/partner/messages'));
+    return {
+      available: true,
+      items: rows.map((r) => ({
+        bookingId: String(r.booking_id ?? r.bookingId ?? ''), last: String(r.last_message ?? r.body ?? ''),
+        lastFrom: r.last_sender === 'guest' || r.sender === 'guest' ? 'guest' : 'partner', lastAt: date(r.last_at ?? r.created_at), unread: num(r.unread),
+      })),
+    };
+  } catch (e) {
+    if (missing(e)) return { available: false, items: [] };
+    throw e;
+  }
+}
+
+export async function getThread(bookingId: string): Promise<{ available: boolean; messages: ChatMessage[] }> {
+  try {
+    const rows = unwrap<Raw>(await api(`/api/partner/bookings/${enc(bookingId)}/messages`));
+    return {
+      available: true,
+      messages: rows.map((r): ChatMessage => ({
+        id: String(r.id), from: r.sender === 'guest' ? 'guest' : 'partner', body: String(r.body ?? ''),
+        at: date(r.created_at) ?? new Date(), read: !!r.read_at,
+      })).sort((a, b) => a.at.getTime() - b.at.getTime()),
+    };
+  } catch (e) {
+    if (missing(e)) return { available: false, messages: [] };
+    throw e;
+  }
+}
+
+export const sendChatMessage = (bookingId: string, body: string) =>
+  api<unknown>(`/api/partner/bookings/${enc(bookingId)}/messages`, { method: 'POST', body: { body } });
+export const markThreadRead = (bookingId: string) =>
+  api<unknown>(`/api/partner/bookings/${enc(bookingId)}/messages/read`, { method: 'POST', body: {} });

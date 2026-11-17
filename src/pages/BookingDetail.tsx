@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import CheckInSheet from '../components/CheckInSheet';
 import SubPage from '../components/SubPage';
-import { AlertIcon, ClockIcon, InfoIcon, PhoneIcon } from '../components/Icons';
+import { AlertIcon, ClockIcon, InfoIcon, MessageIcon, PhoneIcon } from '../components/Icons';
 import { getBookings, type Booking } from '../api/partner';
 import { useApi } from '../api/useApi';
 import { useAuth } from '../auth/AuthContext';
@@ -12,7 +12,6 @@ import '../styles/detail.css';
 
 const when = (d: Date | null) => (d ? `${fmtDate(d)}, ${fmtTime(d)}` : '—');
 const pill = (s: string) => 'pill pill--' + s.toLowerCase().replace(/\s+/g, '-');
-const intl = (phone: string) => { const d = phone.replace(/\D/g, ''); return d.length === 10 ? `91${d}` : d; };
 
 function Row({ label, children, strong }: { label: string; children: ReactNode; strong?: boolean }) {
   return <div className={`drow${strong ? ' drow--strong' : ''}`}><dt>{label}</dt><dd>{children}</dd></div>;
@@ -59,7 +58,7 @@ export default function BookingDetail() {
         </div>
         <div className="actions">
           <a className="abtn abtn--dark dbtn" href={b.phone ? `tel:${b.phone}` : undefined} aria-disabled={!b.phone}><PhoneIcon size={18} /> Call</a>
-          <a className="abtn abtn--ghost dbtn" href={b.phone ? `https://wa.me/${intl(b.phone)}` : undefined} target="_blank" rel="noreferrer" aria-disabled={!b.phone}>WhatsApp</a>
+          {b.status !== 'Cancelled' && b.status !== 'Expired' && <Link className="abtn abtn--ghost dbtn" to={`/messages/${encodeURIComponent(b.id)}`}><MessageIcon size={18} /> Message</Link>}
         </div>
         {ready && canCheckIn && <button type="button" className="abtn abtn--lime dwide" onClick={() => setCheckIn(true)}>Check in guest</button>}
       </section>

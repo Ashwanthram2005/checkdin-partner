@@ -54,3 +54,11 @@
 .pw-show { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; color: var(--ink); padding: 4px 0; }
 .alert--light { color: #c62828; background: #fdecec; border-color: #f5c2c2; }
 .sheet__body > * + * { margin-top: 0; }
+
+.kyc { font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; flex: none; }
+.kyc--ok { background: #e7f8ec; color: #1a7f37; }
+.kyc--wait { background: #fff6e0; color: #9a6700; }
+.kyc--none { background: #f1f1ee; color: var(--muted); }
+.more__site { align-self: flex-start; text-decoration: none; display: inline-flex; align-items: center; }
+.locked span { flex: 1; }
+.locked b { color: var(--ink); }

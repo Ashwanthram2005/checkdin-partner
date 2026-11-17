@@ -2,8 +2,8 @@ import { Link } from 'react-router-dom';
 import { useMemo } from 'react';
 import BottomNav from '../components/BottomNav';
 import ExtensionRequests from '../components/ExtensionRequests';
-import { AlertIcon, BellIcon, BookingsIcon, CalendarIcon, CheckInIcon, ChevronRightSm, UsersIcon } from '../components/Icons';
-import { getBookings, getDashboard, getPropertySettings, updatePropertySettings } from '../api/partner';
+import { AlertIcon, BellIcon, MessageIcon, BookingsIcon, CalendarIcon, CheckInIcon, ChevronRightSm, UsersIcon } from '../components/Icons';
+import { getBookings, getConversations, getDashboard, getPropertySettings, updatePropertySettings } from '../api/partner';
 import { useApi } from '../api/useApi';
 import { useAuth } from '../auth/AuthContext';
 import { useActivity } from '../lib/activity';
@@ -17,6 +17,8 @@ export default function Home() {
   const propertyId = session?.hotelId ?? '';
   const dash = useApi(getDashboard);
   const activity = useActivity();
+  const convos = useApi(getConversations);
+  const unreadChats = (convos.data?.items ?? []).reduce((t, c) => t + c.unread, 0);
   const books = useApi(getBookings);
   const settings = useApi(() => getPropertySettings(propertyId), [propertyId]);
   const [toggling, setToggling] = useState(false);
@@ -70,22 +72,30 @@ export default function Home() {
           <div className="alert" role="alert"><AlertIcon /> {dash.error ?? books.error} <button type="button" className="link-btn" onClick={() => { dash.reload(); books.reload(); settings.reload(); }}>Retry</button></div>
         )}
 
-        <section className={`live${paused ? ' live--paused' : ''}`} aria-label="Booking status">
+        <section className={`live${paused ? ' live--paused' : ''}`} aria-label="Online status">
           <div className="live__text">
             <span className="live__dot" aria-hidden="true" />
             <div>
-              <strong>{settings.loading && !settings.data ? 'Checking…' : paused ? 'Bookings paused' : 'Accepting new bookings'}</strong>
-              <small>{paused ? 'Guests can’t book your slots right now.' : settings.data?.autoAcceptBookings ? 'Auto-accept is on.' : 'You approve each booking.'}</small>
+              <strong>{settings.loading && !settings.data ? 'Checking…' : paused ? 'You’re offline' : 'You’re online'}</strong>
+              <small>{paused ? 'Guests can’t book your slots right now.' : 'Guests can book your slots.'}</small>
             </div>
           </div>
           {can('bookings') && settings.data && (
-            <label className="switch" title={paused ? 'Resume bookings' : 'Pause bookings'}>
-              <input type="checkbox" role="switch" checked={!paused} disabled={toggling} onChange={togglePause} aria-label="Accepting new bookings" />
+            <label className="switch" title={paused ? 'Go online' : 'Go offline'}>
+              <input type="checkbox" role="switch" checked={!paused} disabled={toggling} onChange={togglePause} aria-label="Online" />
               <span className="switch__track" aria-hidden="true"><span className="switch__thumb" /></span>
             </label>
           )}
         </section>
         {toggleError && <div className="alert" role="alert"><AlertIcon /> {toggleError}</div>}
+
+        {unreadChats > 0 && (
+          <Link to="/messages" className="unread-card">
+            <span className="unread-card__icon"><MessageIcon /></span>
+            <span><strong>{unreadChats} unread {unreadChats === 1 ? 'message' : 'messages'}</strong><small>Guests are waiting for a reply</small></span>
+            <ChevronRightSm />
+          </Link>
+        )}
 
         <section className="stats stats--grid" aria-label="Summary">
           {stats.map((s) => (

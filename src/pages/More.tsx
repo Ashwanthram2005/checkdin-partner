@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
 import {
-  AlertIcon, BankIcon, BellIcon, CameraIcon, CalendarIcon, CheckCircleIcon, ClockIcon, MessageIcon, ReportIcon, StarIcon, CheckOutIcon, ChevronRightSm, CloseIcon, EyeIcon, EyeOffIcon, HelpIcon, HotelIdIcon,
+  AlertIcon, BankIcon, FileTextIcon, BellIcon, CameraIcon, CalendarIcon, CheckCircleIcon, ClockIcon, MessageIcon, ReportIcon, StarIcon, CheckOutIcon, ChevronRightSm, CloseIcon, EyeIcon, EyeOffIcon, HelpIcon, HotelIdIcon,
   LockIcon, PhoneIcon, ShieldIcon, UserIcon,
 } from '../components/Icons';
 import { changePassword, getPropertySettings, updatePropertySettings } from '../api/partner';
@@ -13,14 +13,14 @@ import { initials } from '../lib/format';
 import '../styles/bookings.css';
 import '../styles/more.css';
 
-const VERSION = '0.3.0';
+const VERSION = '0.4.0';
 const PORTAL = 'https://partner.checkdin.in';
 
 const MANAGE = [
   { to: '/extensions', label: 'Extensions', hint: 'Guests asking to stay longer', icon: <ClockIcon /> },
   { to: '/availability', label: 'Availability', hint: 'Rooms offered to Checkdin, day by day', icon: <CalendarIcon /> },
   { to: '/reviews', label: 'Reviews', hint: 'Read and reply to guest feedback', icon: <StarIcon size={20} /> },
-  { to: '/guests', label: 'Guests', hint: 'Message guests on WhatsApp or SMS', icon: <MessageIcon /> },
+  { to: '/messages', label: 'Messages', hint: 'Chat with your guests in the app', icon: <MessageIcon /> },
   { to: '/notifications', label: 'Notifications', hint: 'Bookings, check-ins and requests', icon: <BellIcon /> },
   { to: '/reports', label: 'Reports & forecast', hint: 'Revenue, stay lengths, guests', icon: <ReportIcon /> },
   { to: '/property', label: 'Photos & amenities', hint: 'What guests see on your listing', icon: <CameraIcon /> },
@@ -38,7 +38,7 @@ export default function More() {
   const s = settings.data;
   const canEdit = can('bookings');
 
-  async function toggle(key: 'autoAcceptBookings' | 'pauseBookings', value: boolean) {
+  async function toggle(key: 'pauseBookings', value: boolean) {
     setSaving(key); setError(null);
     try { await updatePropertySettings(propertyId, { [key]: value }); settings.reload(); }
     catch (e) { setError((e as Error).message); }
@@ -86,14 +86,12 @@ export default function More() {
           ))}
         </ul>
 
-        <h2 className="group">Bookings</h2>
+        <h2 className="group">Status</h2>
         <ul className="list">
-          <SwitchRow icon={<HotelIdIcon />} label="Accepting new bookings" hint={s?.pauseBookings ? 'Paused — guests can’t book you right now' : 'Guests can book your slots'}
+          <SwitchRow icon={<HotelIdIcon />} label={s?.pauseBookings ? 'Offline' : 'Online'} hint={s?.pauseBookings ? 'You’re offline. Guests can’t book your slots right now.' : 'You’re online. Guests can book your slots.'}
             checked={!!s && !s.pauseBookings} disabled={!s || !canEdit || saving === 'pauseBookings'} onChange={(v) => toggle('pauseBookings', !v)} />
-          <SwitchRow icon={<CheckCircleIcon />} label="Auto-accept bookings" hint={s?.autoAcceptBookings ? 'New bookings are confirmed automatically' : 'You approve each booking'}
-            checked={!!s?.autoAcceptBookings} disabled={!s || !canEdit || saving === 'autoAcceptBookings'} onChange={(v) => toggle('autoAcceptBookings', v)} />
         </ul>
-        {!canEdit && <p className="locked"><ShieldIcon size={16} /> Your role can’t change booking settings.</p>}
+        {!canEdit && <p className="locked"><ShieldIcon size={16} /> Your role can’t change your online status.</p>}
 
         <h2 className="group">Property</h2>
         <ul className="list">
@@ -101,16 +99,21 @@ export default function More() {
             <span className="row__icon"><HotelIdIcon /></span>
             <span className="row__text"><strong>{s?.name ?? property?.name ?? 'Property'}</strong><small>{s?.address || s?.city || 'No address on file'}</small></span>
           </li>
-          {can('finance') && (
-            <li className="row">
-              <span className="row__icon"><BankIcon /></span>
-              <span className="row__text">
-                <strong>Bank account &amp; KYC</strong>
-                <small>{s ? (bankOk ? `${s.banking.bankName} ••${s.banking.accountLast4}` : 'Bank account not verified yet') : 'Checking…'}{s ? ` · PAN ${s.banking.panStatus || '—'} · GST ${s.banking.gstStatus || '—'}` : ''}</small>
-              </span>
-            </li>
-          )}
         </ul>
+
+        {can('finance') && (
+          <>
+            <h2 className="group">PAN, GST &amp; bank</h2>
+            <ul className="list">
+              <KycRow icon={<FileTextIcon />} label="PAN card" status={s?.banking.panStatus} />
+              <KycRow icon={<FileTextIcon />} label="GST" status={s?.banking.gstStatus} />
+              <KycRow icon={<BankIcon />} label="Bank account" status={s ? (bankOk ? 'Verified' : s.banking.status || 'Pending') : undefined}
+                detail={s && bankOk ? `${s.banking.bankName} ••${s.banking.accountLast4}` : undefined} />
+            </ul>
+            <p className="locked"><LockIcon size={16} /><span>PAN, GST and bank details can only be changed on the Checkdin partner website, on a computer. Log in at <b>partner.checkdin.in</b> and open Settings.</span></p>
+            <a className="abtn-clear more__site" href={PORTAL} target="_blank" rel="noreferrer">Open partner.checkdin.in</a>
+          </>
+        )}
 
         <h2 className="group">Security</h2>
         <ul className="list">
@@ -130,7 +133,7 @@ export default function More() {
         <ul className="list">
           <li><a className="row row--link" href={PORTAL} target="_blank" rel="noreferrer">
             <span className="row__icon"><HelpIcon /></span>
-            <span className="row__text"><strong>Open the partner portal</strong><small>Availability, reviews, reports and more</small></span>
+            <span className="row__text"><strong>Open the partner portal</strong><small>Change PAN, GST and bank details (on a computer)</small></span>
             <ChevronRightSm />
           </a></li>
         </ul>
@@ -161,6 +164,18 @@ export default function More() {
 
       {pwOpen && <PasswordSheet onClose={() => setPwOpen(false)} />}
     </div>
+  );
+}
+
+function KycRow({ icon, label, status, detail }: { icon: ReactNode; label: string; status?: string; detail?: string }) {
+  const st = (status || '').toLowerCase();
+  const tone = st === 'verified' || st === 'active' || st === 'approved' ? 'ok' : st ? 'wait' : 'none';
+  return (
+    <li className="row">
+      <span className="row__icon">{icon}</span>
+      <span className="row__text"><strong>{label}</strong><small>{detail ?? 'View only in the app'}</small></span>
+      <span className={`kyc kyc--${tone}`}>{status || '—'}</span>
+    </li>
   );
 }
 

@@ -6,9 +6,10 @@ import BookingDetail from './pages/BookingDetail';
 import Bookings from './pages/Bookings';
 import ExtensionsPage from './pages/ExtensionsPage';
 import ForgotPassword from './pages/ForgotPassword';
-import GuestMessages from './pages/GuestMessages';
+import Chat from './pages/Chat';
 import Home from './pages/Home';
 import Login from './pages/Login';
+import Messages from './pages/Messages';
 import More from './pages/More';
 import Notifications from './pages/Notifications';
 import Pricing from './pages/Pricing';
@@ -34,7 +35,9 @@ export default function App() {
       <Route path="/revenue" element={guard(<Revenue />)} />
       <Route path="/availability" element={guard(<Availability />)} />
       <Route path="/reviews" element={guard(<Reviews />)} />
-      <Route path="/guests" element={guard(<GuestMessages />)} />
+      <Route path="/messages" element={guard(<Messages />)} />
+      <Route path="/messages/:bookingId" element={guard(<Chat />)} />
+      <Route path="/guests" element={<Navigate to="/messages" replace />} />
       <Route path="/notifications" element={guard(<Notifications />)} />
       <Route path="/reports" element={guard(<Reports />)} />
       <Route path="/property" element={guard(<PropertyPhotos />)} />
