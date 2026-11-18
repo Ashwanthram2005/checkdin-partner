@@ -234,3 +234,19 @@ export const StoreIcon = ({ size = 20 }: P) => (
 export const WifiOffIcon = ({ size = 28 }: P) => (
   <svg {...svgProps(size)}><path d="M3.500 3.500l17 17M8.500 15.500a5 5 0 0 1 4.800-1.300M5.300 12.200a9.500 9.500 0 0 1 3.400-2M16 9.300A9.500 9.500 0 0 1 18.700 12.200M2.500 8.800a14 14 0 0 1 4.300-2.700M10.800 6.100A14 14 0 0 1 21.500 8.800M12 19.200h.01" /></svg>
 );
+
+export const BedIcon = ({ size = 24 }: P) => (
+  <svg {...svgProps(size)}><path d="M3.500 18.500V6M3.500 14h17v4.500M20.500 14v-2.500A2.500 2.500 0 0 0 18 9h-6.500v5M7.500 11.500h.01" /></svg>
+);
+export const HeadsetIcon = ({ size = 24 }: P) => (
+  <svg {...svgProps(size)}><path d="M4.500 13.500V12a7.500 7.500 0 0 1 15 0v1.500M4.500 13.500h2.500v4H5.500a1 1 0 0 1-1-1v-3zM19.500 13.500H17v4h1.500a1 1 0 0 0 1-1v-3zM17 17.500c0 1.700-1.800 2.500-4 2.500" /></svg>
+);
+export const BoltIcon = ({ size = 24 }: P) => (
+  <svg {...svgProps(size)}><path d="M13 3L5.500 13.500H11L10 21l7.500-10.500H12L13 3z" /></svg>
+);
+export const ExternalIcon = ({ size = 22 }: P) => (
+  <svg {...svgProps(size)}><path d="M14 4h6v6M20 4l-8.500 8.500M18 14v4.500A1.500 1.500 0 0 1 16.500 20h-11A1.500 1.500 0 0 1 4 18.500v-11A1.500 1.500 0 0 1 5.500 6H10" /></svg>
+);
+export const MenuIcon = ({ size = 26 }: P) => (
+  <svg {...svgProps(size)}><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+);
